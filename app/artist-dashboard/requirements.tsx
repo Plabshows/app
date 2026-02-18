@@ -89,10 +89,13 @@ export default function RequirementsSection() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { error } = await supabase.from('acts').update({
-                    technical_specs: specs,
-                    technical_rider_url: riderUrl
-                }).eq('owner_id', user.id);
+                const { error } = await supabase
+                    .from('acts')
+                    .upsert({
+                        owner_id: user.id,
+                        technical_specs: specs,
+                        technical_rider_url: riderUrl
+                    }, { onConflict: 'owner_id' });
 
                 if (error) throw error;
                 Alert.alert('Success', 'Requirements updated');

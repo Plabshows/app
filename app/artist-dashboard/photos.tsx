@@ -68,9 +68,24 @@ export default function PhotoManagement() {
                 }
 
                 const updatedPhotos = [...photos, ...newUrls];
-                await supabase.from('acts').update({ photos_url: updatedPhotos }).eq('owner_id', user.id);
+
+                // --- SELF-HEALING UPSERT ---
+                // This ensures that even if the 'act' doesn't exist yet, it's created on the fly.
+                const { error: upsertError } = await supabase
+                    .from('acts')
+                    .upsert({
+                        owner_id: user.id,
+                        photos_url: updatedPhotos,
+                        name: photos.length === 0 ? 'Untitled Act' : undefined, // Provide a default if it's the first creation
+                        category_id: photos.length === 0 ? 'd2e6678c-f5ea-4c82-8ba1-ecf5ea65c440' : undefined // Default to first cat if needed
+                    }, { onConflict: 'owner_id' });
+
+                if (upsertError) throw upsertError;
+
                 setPhotos(updatedPhotos);
+                Alert.alert('Success', 'Gallery updated successfully!');
             } catch (e: any) {
+                console.error('[Photos] Upload Error:', e);
                 Alert.alert('Upload Error', e.message);
             } finally {
                 setUploading(false);

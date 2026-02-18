@@ -36,7 +36,13 @@ export default function VideoManagement() {
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { error } = await supabase.from('acts').update({ video_url: videoUrl }).eq('owner_id', user.id);
+            const { error } = await supabase
+                .from('acts')
+                .upsert({
+                    owner_id: user.id,
+                    video_url: videoUrl
+                }, { onConflict: 'owner_id' });
+
             if (error) Alert.alert('Error', error.message);
             else Alert.alert('Success', 'Video updated');
         }

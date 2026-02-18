@@ -42,10 +42,14 @@ export default function ExperienceSection() {
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { error } = await supabase.from('acts').update({
-                experience_years: parseInt(data.experience_years) || 0,
-                description: data.experience_description
-            }).eq('owner_id', user.id);
+            const { error } = await supabase
+                .from('acts')
+                .upsert({
+                    owner_id: user.id,
+                    experience_years: parseInt(data.experience_years) || 0,
+                    description: data.experience_description
+                }, { onConflict: 'owner_id' });
+
             if (error) Alert.alert('Error', error.message);
             else Alert.alert('Success', 'Experience updated');
         }
