@@ -65,13 +65,20 @@ export default function ActDetail() {
                 <View style={styles.priceRow}>
                     <View>
                         <Text style={styles.priceLabel}>Starting from</Text>
-                        <Text style={styles.price}>{act.price_guide || act.price_range}</Text>
+                        <Text style={styles.price}>{act.price_guide || act.price_range || 'Contact'}</Text>
                     </View>
                     <Pressable
                         style={styles.quoteButton}
-                        onPress={() => router.push({ pathname: '/modal', params: { actId: act.id, actTitle: act.name || act.title } })}
+                        onPress={() => router.push({
+                            pathname: '/modal',
+                            params: {
+                                actId: act.id,
+                                actTitle: act.name || act.title,
+                                ownerId: (act as any).owner_id
+                            }
+                        })}
                     >
-                        <Text style={styles.quoteButtonText}>Get Instant Quote</Text>
+                        <Text style={styles.quoteButtonText}>Consultar Disponibilidad</Text>
                     </Pressable>
                 </View>
 

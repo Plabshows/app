@@ -8,53 +8,48 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fr
 export default function ModalScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { actId, actTitle } = params;
+  const { actId, actTitle, ownerId } = params;
 
+  const [clientName, setClientName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [date, setDate] = useState('');
-  const [location, setLocation] = useState('');
-  const [duration, setDuration] = useState('');
+  const [requirements, setRequirements] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!date || !location) return; // Basic validation
+    if (!clientName || !whatsapp || !date) {
+      alert('Por favor, completa los campos requeridos.');
+      return;
+    }
 
     setSubmitting(true);
 
     try {
-      // Insert into Supabase
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert('You must be logged in to request a quote');
-        setSubmitting(false);
-        return;
-      }
-
       const { error } = await supabase
-        .from('bookings')
+        .from('leads')
         .insert({
           act_id: actId,
-          client_id: user.id,
+          act_owner_id: ownerId,
+          client_name: clientName,
+          client_whatsapp: whatsapp,
           event_date: date,
-          location: location,
-          duration: duration,
           status: 'pending'
         });
 
       if (error) {
         console.error(error);
-        alert('Error sending request: ' + error.message);
+        alert('Error al enviar la solicitud: ' + error.message);
         setSubmitting(false);
         return;
       }
 
       setSubmitting(false);
+      alert('¡Solicitud de disponibilidad enviada! Te contactaremos pronto.');
       router.back();
-      alert('Quote Request Sent!');
     } catch (err) {
       console.error(err);
       setSubmitting(false);
-      alert('An unexpected error occurred.');
+      alert('Ocurrió un error inesperado.');
     }
   };
 
@@ -63,16 +58,39 @@ export default function ModalScreen() {
       <StatusBar style="light" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Request Quote</Text>
+        <Text style={styles.headerTitle}>Consultar Disponibilidad</Text>
         <Text style={styles.actTitle}>{actTitle}</Text>
       </View>
 
-      <ScrollView style={styles.form}>
+      <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Event Date</Text>
+          <Text style={styles.label}>Nombre Completo *</Text>
           <TextInput
             style={styles.input}
-            placeholder="YYYY-MM-DD"
+            placeholder="Tu nombre"
+            placeholderTextColor="#666"
+            value={clientName}
+            onChangeText={setClientName}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>WhatsApp / Teléfono *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="+34 ..."
+            placeholderTextColor="#666"
+            keyboardType="phone-pad"
+            value={whatsapp}
+            onChangeText={setWhatsapp}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Fecha del Evento *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="DD/MM/AAAA"
             placeholderTextColor="#666"
             value={date}
             onChangeText={setDate}
@@ -80,26 +98,15 @@ export default function ModalScreen() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Location</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Dubai, UAE"
-            placeholderTextColor="#666"
-            value={location}
-            onChangeText={setLocation}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Duration/Requirements</Text>
+          <Text style={styles.label}>Detalles adicionales</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="e.g. 2 hours, roaming set"
+            placeholder="Tipo de evento, duración, etc."
             placeholderTextColor="#666"
             multiline
             numberOfLines={4}
-            value={duration}
-            onChangeText={setDuration}
+            value={requirements}
+            onChangeText={setRequirements}
           />
         </View>
 
@@ -109,11 +116,10 @@ export default function ModalScreen() {
           disabled={submitting}
         >
           <Text style={styles.submitButtonText}>
-            {submitting ? 'Sending...' : 'Send Request'}
+            {submitting ? 'Enviando...' : 'Enviar Solicitud'}
           </Text>
         </Pressable>
       </ScrollView>
-
     </View>
   );
 }

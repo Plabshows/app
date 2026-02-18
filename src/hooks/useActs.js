@@ -12,38 +12,50 @@ export function useActs() {
         fetchActs();
     }, []);
 
-    async function fetchActs() {
+    async function fetchActs(filters = {}) {
+        const { query, category } = filters;
         try {
             setLoading(true);
 
-            // Check if Supabase is actually configured with valid keys
+            // Check if Supabase is actually configured
             const isSupabaseConfigured = process.env.EXPO_PUBLIC_SUPABASE_URL &&
                 process.env.EXPO_PUBLIC_SUPABASE_URL !== 'your-supabase-url' &&
                 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
             if (!isSupabaseConfigured) {
-                console.log('Supabase not fully configured, using mock data.');
                 setActs(MOCK_ACTS);
                 return;
             }
 
-            const { data, error } = await supabase
+            let supabaseQuery = supabase
                 .from('acts')
                 .select('*, category:categories(name, slug)')
                 .eq('is_published', true);
 
+            if (category) {
+                // Filter by category name (joined column)
+                // Note: categories is a joined table, we use dot notation for filtering nested data if supported,
+                // otherwise we filter on acts.category_id after fetching or use a join-aware filter.
+                // In Supabase, filtering on a joined table's column:
+                supabaseQuery = supabaseQuery.filter('categories.name', 'eq', category);
+            }
+
+            if (query) {
+                supabaseQuery = supabaseQuery.ilike('name', `%${query}%`);
+            }
+
+            const { data, error } = await supabaseQuery;
+
             if (data && data.length > 0) {
-                // Flatten category object to string for frontend compatibility with existing components
                 const mappedData = data.map(act => ({
                     ...act,
                     category: act.category?.name || 'Uncategorized'
                 }));
                 setActs(mappedData);
-            } else {
-                // Fallback if DB is connected but empty
-                console.log('No published acts in DB, using mock data.');
-                // Note: Mock data still uses 'title', we might want to update it later
+            } else if (!query && !category) {
                 setActs(MOCK_ACTS);
+            } else {
+                setActs([]); // No results for the filter
             }
 
             if (error) {
@@ -52,7 +64,6 @@ export function useActs() {
         } catch (e) {
             console.error('Error fetching acts:', e);
             setError(e);
-            // Fallback on error - acts is already MOCK_ACTS from initial state, but explicit set ensures consistency
             setActs(MOCK_ACTS);
         } finally {
             setLoading(false);

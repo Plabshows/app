@@ -77,26 +77,36 @@ const CATEGORY_ICONS = {
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const { acts, loading } = useActs();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const { acts, loading, refetch } = useActs();
+
+  // --- REAL-TIME SEARCH & FILTER LOGIC ---
+  React.useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      refetch({ query: searchQuery, category: activeCategory });
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, activeCategory]);
 
   // Filter acts for "Featured" - picking a diverse sample from different categories
   const featuredActs = React.useMemo(() => {
+    if (!acts) return [];
     const categoriesMap = new Map();
     acts.forEach(act => {
       if (!categoriesMap.has(act.category)) {
         categoriesMap.set(act.category, act);
       }
     });
-    // Return values of the map, limited to 6 or 8 for variety
     return Array.from(categoriesMap.values()).slice(0, 8);
   }, [acts]);
 
   // Hero act (e.g., the first one with a video)
-  const heroAct = acts.find(a => a.video_url) || acts[0];
+  const heroAct = acts?.find(a => a.video_url) || acts?.[0];
   const heroTitle = heroAct?.name || 'Cyberpunk Shows';
 
-  if (loading) {
+  if (loading && !acts.length) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -118,11 +128,6 @@ export default function DiscoverScreen() {
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onSubmitEditing={() => {
-            if (searchQuery.trim()) {
-              router.push(`/(tabs)/search?query=${encodeURIComponent(searchQuery)}`);
-            }
-          }}
           returnKeyType="search"
         />
       </View>
@@ -138,11 +143,11 @@ export default function DiscoverScreen() {
         {TOP_CATEGORIES.map((cat) => (
           <Pressable
             key={cat.id}
-            style={styles.topNavItem}
-            onPress={() => router.push(`/(tabs)/search?category=${cat.name}`)}
+            style={[styles.topNavItem, activeCategory === cat.name && styles.activeTopNavItem]}
+            onPress={() => setActiveCategory(activeCategory === cat.name ? null : cat.name)}
           >
-            <cat.icon size={24} color={COLORS.textDim} strokeWidth={1.5} />
-            <Text style={styles.topNavText}>{cat.name}</Text>
+            <cat.icon size={24} color={activeCategory === cat.name ? COLORS.primary : COLORS.textDim} strokeWidth={1.5} />
+            <Text style={[styles.topNavText, activeCategory === cat.name && styles.activeTopNavText]}>{cat.name}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -162,8 +167,10 @@ export default function DiscoverScreen() {
               shouldPlay
               isMuted={true}
             />
+          ) : heroAct?.image_url ? (
+            <Image source={{ uri: heroAct.image_url }} style={StyleSheet.absoluteFill} />
           ) : (
-            <Image source={{ uri: heroAct?.image_url }} style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
           )}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.9)']}
@@ -181,38 +188,48 @@ export default function DiscoverScreen() {
   const renderFeatured = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Featured Artists</Text>
-        <Pressable onPress={() => router.push('/(tabs)/search')}>
-          <Text style={styles.seeAll}>See All</Text>
-        </Pressable>
+        <Text style={styles.sectionTitle}>
+          {searchQuery || activeCategory ? 'Search Results' : 'Featured Artists'}
+        </Text>
       </View>
-      <FlatList
-        horizontal
-        data={featuredActs}
-        keyExtractor={item => item.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: SPACING.m }}
-        renderItem={({ item }) => (
-          <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-            <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
-              style={styles.featuredGradient}
-            />
-            <View style={styles.featuredContent}>
-              <View style={styles.featuredTopRow}>
-                <View style={styles.ratingBadge}>
-                  <Sparkles size={10} color={COLORS.background} />
-                  <Text style={styles.ratingText}>5.0</Text>
-                </View>
-              </View>
-              <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.featuredCategory}>{item.category}</Text>
-              <Text style={styles.featuredLocation}>Dubai, UAE</Text>
-            </View>
+
+      {!acts.length && !loading ? (
+        <View style={styles.emptyContainer}>
+          <Ghost size={48} color={COLORS.textDim} />
+          <Text style={styles.emptyText}>No artists available in this category</Text>
+          <Pressable onPress={() => { setSearchQuery(''); setActiveCategory(null); }}>
+            <Text style={styles.clearText}>Clear filters</Text>
           </Pressable>
-        )}
-      />
+        </View>
+      ) : (
+        <FlatList
+          horizontal
+          data={acts}
+          keyExtractor={item => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SPACING.m }}
+          renderItem={({ item }) => (
+            <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
+              <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
+                style={styles.featuredGradient}
+              />
+              <View style={styles.featuredContent}>
+                <View style={styles.featuredTopRow}>
+                  <View style={styles.ratingBadge}>
+                    <Sparkles size={10} color={COLORS.background} />
+                    <Text style={styles.ratingText}>5.0</Text>
+                  </View>
+                </View>
+                <Text style={styles.featuredTitle} numberOfLines={1}>{(item as any).name || (item as any).title}</Text>
+                <Text style={styles.featuredCategory}>{item.category}</Text>
+                <Text style={styles.featuredLocation}>{(item as any).location || 'Dubai, UAE'}</Text>
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
     </View>
   );
 
@@ -225,13 +242,13 @@ export default function DiscoverScreen() {
           return (
             <Pressable
               key={index}
-              style={styles.categoryCard}
-              onPress={() => router.push(`/(tabs)/search?category=${cat}`)}
+              style={[styles.categoryCard, activeCategory === cat && styles.activeCategoryCard]}
+              onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
             >
-              <View style={styles.categoryIconContainer}>
-                <IconComponent size={24} color={COLORS.primary} />
+              <View style={[styles.categoryIconContainer, activeCategory === cat && styles.activeCategoryIconContainer]}>
+                <IconComponent size={24} color={activeCategory === cat ? COLORS.background : COLORS.primary} />
               </View>
-              <Text style={styles.categoryText}>{cat}</Text>
+              <Text style={[styles.categoryText, activeCategory === cat && styles.activeCategoryText]}>{cat}</Text>
             </Pressable>
           );
         })}
@@ -502,5 +519,46 @@ const styles = StyleSheet.create({
     color: COLORS.textDim,
     fontSize: 12,
     textAlign: 'center',
+  },
+  activeTopNavItem: {
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
+    paddingBottom: 4,
+  },
+  activeTopNavText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: SPACING.xl,
+    backgroundColor: '#111',
+    marginHorizontal: SPACING.m,
+    borderRadius: 16,
+    gap: 12,
+    height: 200,
+    justifyContent: 'center',
+  },
+  emptyText: {
+    color: COLORS.textDim,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  clearText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginTop: 10,
+  },
+  activeCategoryCard: {
+    opacity: 1,
+  },
+  activeCategoryIconContainer: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  activeCategoryText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
   },
 });

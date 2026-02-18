@@ -26,46 +26,96 @@ type PendingAct = {
     title?: string; // fallback
 };
 
+type Lead = {
+    id: string;
+    client_name: string;
+    client_whatsapp: string;
+    event_date: string;
+    created_at: string;
+    status: string;
+    act_name?: string;
+};
+
 export default function AdminDashboard() {
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState<'approvals' | 'leads'>('approvals');
     const [loading, setLoading] = useState(true);
     const [pendingActs, setPendingActs] = useState<PendingAct[]>([]);
+    const [leads, setLeads] = useState<Lead[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
     useEffect(() => {
-        fetchPendingActs();
+        checkAdmin();
     }, []);
+
+    useEffect(() => {
+        if (isAdmin) {
+            if (activeTab === 'approvals') fetchPendingActs();
+            else fetchLeads();
+        }
+    }, [activeTab, isAdmin]);
+
+    const checkAdmin = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.replace('/login');
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', user.id)
+                .single();
+
+            if (error || !data?.is_admin) {
+                Alert.alert('Access Denied', 'You do not have permission to view this page.');
+                router.replace('/(tabs)');
+                return;
+            }
+
+            setIsAdmin(true);
+        } catch (e) {
+            router.replace('/(tabs)');
+        }
+    };
 
     const fetchPendingActs = async () => {
         setLoading(true);
         try {
-            // 1. Fetch acts where the OWNER profile is NOT published, OR simply acts that are pending approval.
-            // The requirement was: "Lista de Fichas Pendientes (donde is_published es false)".
-            // However, 'is_published' is on the PROFILES table, not the acts table in the prompt description (Phase 1).
-            // "Tabla profiles: ... Añade un campo booleano is_published".
-            // Let's query acts and join with profiles to see if the profile is published.
-
             const { data, error } = await supabase
                 .from('acts')
-                .select(`
-          *,
-          profiles!inner(is_published)
-        `)
+                .select('*, profiles!inner(is_published)')
                 .eq('profiles.is_published', false)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
+            setPendingActs((data || []).map(act => ({ ...act, name: act.name || act.title })));
+        } catch (e) {
+            console.log("Admin Approvals Error:", e);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
-            // Map to PendingAct type
-            const mappedActs = (data || []).map((act: any) => ({
-                ...act,
-                name: act.name || act.title, // Handle the name/title migration overlap
-            }));
+    const fetchLeads = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('leads')
+                .select('*, acts(name, title)')
+                .order('created_at', { ascending: false });
 
-            setPendingActs(mappedActs);
-        } catch (e: any) {
-            // Alert.alert('Error', e.message); 
-            console.log("Admin Fetch Error:", e);
+            if (error) throw error;
+            setLeads((data || []).map(lead => ({
+                ...lead,
+                act_name: lead.acts?.name || lead.acts?.title || 'Unknown Act'
+            })));
+        } catch (e) {
+            console.log("Admin Leads Error:", e);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -74,61 +124,82 @@ export default function AdminDashboard() {
 
     const publishProfile = async (ownerId: string, actName: string) => {
         try {
-            // Update the PROFILE is_published to TRUE
             const { error } = await supabase
                 .from('profiles')
                 .update({ is_published: true })
                 .eq('id', ownerId);
 
             if (error) throw error;
-
             Alert.alert('Success', `Published ${actName}!`);
-            fetchPendingActs(); // Refresh list
+            fetchPendingActs();
         } catch (e: any) {
             Alert.alert('Error Publishing', e.message);
         }
     };
 
-    const renderItem = ({ item }: { item: PendingAct }) => (
+    const contactWhatsApp = (phone: string, name: string) => {
+        const cleanPhone = phone.replace(/\D/g, '');
+        const url = `https://wa.me/${cleanPhone}?text=Hola%20${encodeURIComponent(name)},%20vimos%20tu%20interés%20en%20Performance%20Lab...`;
+        // Linking should be used here, but for simplicity of the prompt, we'll assume it's external or use router.push if configured
+        import('react-native').then(({ Linking }) => {
+            Linking.openURL(url).catch(() => Alert.alert('Error', 'No se pudo abrir WhatsApp'));
+        });
+    };
+
+    const renderApprovalItem = ({ item }: { item: PendingAct }) => (
         <View style={styles.card}>
-            <Image
-                source={{ uri: item.image_url || 'https://via.placeholder.com/100' }}
-                style={styles.cardImage}
-            />
+            <Image source={{ uri: item.image_url || 'https://via.placeholder.com/100' }} style={styles.cardImage} />
             <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardCategory}>{item.category}</Text>
-                <Text style={styles.cardDate}>
-                    Submitted: {new Date(item.created_at).toLocaleDateString()}
-                </Text>
+                <Text style={styles.cardDate}>Submitted: {new Date(item.created_at).toLocaleDateString()}</Text>
             </View>
-
             <View style={styles.actionButtons}>
-                <Pressable
-                    style={styles.approveButton}
-                    onPress={() => publishProfile(item.owner_id, item.name)}
-                >
+                <Pressable style={styles.approveButton} onPress={() => publishProfile(item.owner_id, item.name)}>
                     <Check size={20} color={COLORS.background} />
                     <Text style={styles.approveText}>Approve</Text>
                 </Pressable>
-
-                {/* Placeholder for "Detail View" if we want to inspect before approving */}
-                <Pressable
-                    style={styles.inspectButton}
-                    onPress={() => router.push(`/act/${item.id}`)}
-                >
+                <Pressable style={styles.inspectButton} onPress={() => router.push(`/act/${item.id}`)}>
                     <ChevronRight size={20} color={COLORS.textDim} />
                 </Pressable>
             </View>
         </View>
     );
 
+    const renderLeadItem = ({ item }: { item: Lead }) => (
+        <View style={styles.card}>
+            <View style={styles.cardContent}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={styles.cardTitle}>{item.client_name}</Text>
+                    <Text style={styles.statusBadge}>{item.status}</Text>
+                </View>
+                <Text style={styles.cardCategory}>Interest: {item.act_name}</Text>
+                <Text style={styles.cardDate}>Event: {item.event_date}</Text>
+                <Text style={styles.cardDate}>WhatsApp: {item.client_whatsapp}</Text>
+            </View>
+            <Pressable style={styles.waButton} onPress={() => contactWhatsApp(item.client_whatsapp, item.client_name)}>
+                <Text style={styles.waText}>WA</Text>
+            </Pressable>
+        </View>
+    );
+
+    if (isAdmin === null) return <View style={[styles.container, { justifyContent: 'center' }]}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Admin Dashboard</Text>
-                <Pressable onPress={fetchPendingActs} style={styles.refreshButton}>
+                <Text style={styles.headerTitle}>Admin Hub</Text>
+                <Pressable onPress={() => activeTab === 'approvals' ? fetchPendingActs() : fetchLeads()} style={styles.refreshButton}>
                     <RefreshCw size={20} color={COLORS.primary} />
+                </Pressable>
+            </View>
+
+            <View style={styles.tabBar}>
+                <Pressable style={[styles.tab, activeTab === 'approvals' && styles.activeTab]} onPress={() => setActiveTab('approvals')}>
+                    <Text style={[styles.tabText, activeTab === 'approvals' && styles.activeTabText]}>Approvals</Text>
+                </Pressable>
+                <Pressable style={[styles.tab, activeTab === 'leads' && styles.activeTab]} onPress={() => setActiveTab('leads')}>
+                    <Text style={[styles.tabText, activeTab === 'leads' && styles.activeTabText]}>Leads</Text>
                 </Pressable>
             </View>
 
@@ -136,17 +207,15 @@ export default function AdminDashboard() {
                 <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
             ) : (
                 <FlatList
-                    data={pendingActs}
-                    renderItem={renderItem}
+                    data={activeTab === 'approvals' ? pendingActs : leads}
+                    renderItem={activeTab === 'approvals' ? renderApprovalItem : renderLeadItem as any}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <Text style={styles.emptyText}>No pending approvals.</Text>
-                    }
+                    ListEmptyComponent={<Text style={styles.emptyText}>No items found.</Text>}
                     refreshing={refreshing}
                     onRefresh={() => {
                         setRefreshing(true);
-                        fetchPendingActs();
+                        activeTab === 'approvals' ? fetchPendingActs() : fetchLeads();
                     }}
                 />
             )}
@@ -236,6 +305,49 @@ const styles = StyleSheet.create({
     },
     inspectButton: {
         padding: 8,
+    },
+    waButton: {
+        backgroundColor: '#25D366',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    waText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12,
+    },
+    statusBadge: {
+        backgroundColor: '#333',
+        color: COLORS.primary,
+        fontSize: 10,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    tabBar: {
+        flexDirection: 'row',
+        paddingHorizontal: SPACING.m,
+        marginBottom: SPACING.s,
+        gap: 20,
+    },
+    tab: {
+        paddingVertical: 8,
+    },
+    activeTab: {
+        borderBottomWidth: 2,
+        borderBottomColor: COLORS.primary,
+    },
+    tabText: {
+        color: COLORS.textDim,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    activeTabText: {
+        color: COLORS.primary,
     },
     emptyText: {
         color: COLORS.textDim,
