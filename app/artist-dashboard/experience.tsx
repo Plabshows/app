@@ -1,0 +1,116 @@
+
+import { COLORS, SPACING } from '@/src/constants/theme';
+import { supabase } from '@/src/lib/supabase';
+import { History } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
+} from 'react-native';
+
+export default function ExperienceSection() {
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [data, setData] = useState({
+        experience_years: '',
+        experience_description: '' // We'll map this to acts.description or a new field if needed, but the user asked for "Experience" specifically
+    });
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: act } = await supabase.from('acts').select('experience_years, description').eq('owner_id', user.id).single();
+            if (act) setData({
+                experience_years: String(act.experience_years || ''),
+                experience_description: act.description || ''
+            });
+        }
+        setLoading(false);
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { error } = await supabase.from('acts').update({
+                experience_years: parseInt(data.experience_years) || 0,
+                description: data.experience_description
+            }).eq('owner_id', user.id);
+            if (error) Alert.alert('Error', error.message);
+            else Alert.alert('Success', 'Experience updated');
+        }
+        setSaving(false);
+    };
+
+    if (loading) return (
+        <View style={styles.centered}>
+            <ActivityIndicator color={COLORS.primary} />
+        </View>
+    );
+
+    return (
+        <ScrollView contentContainerStyle={styles.container}>
+            <Text style={styles.title}>Experience</Text>
+            <Text style={styles.subtitle}>Highlight your professional journey and key milestones.</Text>
+
+            <View style={styles.card}>
+                <View style={styles.field}>
+                    <Text style={styles.label}>Years of Experience</Text>
+                    <View style={styles.inputWrapper}>
+                        <History size={18} color={COLORS.textDim} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            value={data.experience_years}
+                            onChangeText={t => setData({ ...data, experience_years: t })}
+                            placeholder="e.g. 5"
+                            keyboardType="numeric"
+                            placeholderTextColor={COLORS.textDim}
+                        />
+                    </View>
+                </View>
+
+                <View style={styles.field}>
+                    <Text style={styles.label}>Detailed Experience / Key Highlights</Text>
+                    <TextInput
+                        style={[styles.input, styles.textArea]}
+                        value={data.experience_description}
+                        onChangeText={t => setData({ ...data, experience_description: t })}
+                        multiline
+                        placeholder="Describe your career highlights, major venues, and notable clients..."
+                        placeholderTextColor={COLORS.textDim}
+                    />
+                </View>
+
+                <Pressable style={styles.button} onPress={handleSave}>
+                    {saving ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.buttonText}>Update Experience</Text>}
+                </Pressable>
+            </View>
+        </ScrollView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { padding: SPACING.l },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+    title: { fontSize: 24, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 },
+    subtitle: { fontSize: 14, color: COLORS.textDim, marginBottom: 24 },
+    card: { backgroundColor: '#1A1A1A', padding: 24, borderRadius: 16, borderWidth: 1, borderColor: '#222' },
+    field: { marginBottom: 24 },
+    label: { color: COLORS.textDim, marginBottom: 8, fontSize: 12, textTransform: 'uppercase', fontWeight: 'bold' },
+    inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#222', borderRadius: 8, borderWidth: 1, borderColor: '#333' },
+    inputIcon: { marginLeft: 16 },
+    input: { flex: 1, color: COLORS.text, padding: 16, fontSize: 16 },
+    textArea: { height: 200, textAlignVertical: 'top' },
+    button: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 8, alignItems: 'center' },
+    buttonText: { color: COLORS.background, fontWeight: 'bold', fontSize: 16 }
+});
