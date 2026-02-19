@@ -1,11 +1,11 @@
 
-import { COLORS, SPACING } from '@/src/constants/theme';
-import { supabase } from '@/src/lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 import { ChevronDown, Save, Star, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -16,10 +16,14 @@ import {
     TextInput,
     View
 } from 'react-native';
+import { COLORS, SPACING } from '../../src/constants/theme';
+import { useAuth } from '../../src/context/AuthContext';
+import { supabase } from '../../src/lib/supabase';
 
 const ARTIST_TYPES = ['Solo', 'Duo', 'Trio', 'Quartet', 'Band (5+)', 'Group/Crew'];
 
 export default function UnifiedEditProfile() {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [categories, setCategories] = useState<any[]>([]);
@@ -44,6 +48,11 @@ export default function UnifiedEditProfile() {
     const [modalType, setModalType] = useState<'category' | 'type'>('category');
     const [errors, setErrors] = useState<string[]>([]);
 
+    // Image/Upload State
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -53,8 +62,10 @@ export default function UnifiedEditProfile() {
             const { data: catData } = await supabase.from('categories').select('*').order('name');
             setCategories(catData || []);
 
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) {
+                console.log('[fetchData] No user found in AuthContext');
+                return;
+            }
 
             // Fetch Profile
             const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -73,10 +84,27 @@ export default function UnifiedEditProfile() {
                 genre: act?.genre || '',
                 bio: act?.description || ''
             });
+
+            // Ensure existingPhotoUrl is a string (the first photo)
+            const photo = Array.isArray(act?.photos_url) ? act.photos_url[0] : act?.photos_url;
+            setExistingPhotoUrl(photo || null);
         } catch (err) {
             console.error('Error fetching profile data:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setSelectedImage(result.assets[0].uri);
         }
     };
 
@@ -96,10 +124,52 @@ export default function UnifiedEditProfile() {
         }
 
         setSaving(true);
+        console.log('[handleSave] Starting save process...');
         try {
-            const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user found');
 
+            let finalPhotoUrl = existingPhotoUrl;
+
+            // 1. Detección de Imagen & Subida
+            if (selectedImage) {
+                console.log('[handleSave] New image detected, starting upload:', selectedImage);
+                setIsUploading(true);
+                const fileExt = selectedImage.split('.').pop();
+                const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+                const filePath = fileName;
+
+                try {
+                    // Blob-based upload for reliable cross-platform support
+                    const response = await fetch(selectedImage);
+                    const blob = await response.blob();
+
+                    console.log('[handleSave] Uploading to storage bucket...');
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('artist-portfolio')
+                        .upload(filePath, blob, {
+                            contentType: `image/${fileExt}`,
+                            upsert: true
+                        });
+
+                    if (uploadError) throw uploadError;
+                    console.log('[handleSave] Upload successful:', uploadData);
+
+                    // 2. Obtención de URL Pública
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('artist-portfolio')
+                        .getPublicUrl(filePath);
+
+                    finalPhotoUrl = publicUrl;
+                    console.log('[handleSave] Public URL obtained:', finalPhotoUrl);
+                } catch (uploadErr: any) {
+                    console.error('[handleSave] Upload Step Error:', uploadErr);
+                    throw new Error(`Failed to upload image: ${uploadErr.message}`);
+                } finally {
+                    setIsUploading(false);
+                }
+            }
+
+            console.log('[handleSave] Updating profile data in DB...');
             // 1. Update Profiles Table
             const { error: profError } = await supabase
                 .from('profiles')
@@ -110,27 +180,43 @@ export default function UnifiedEditProfile() {
                 })
                 .eq('id', user.id);
 
-            if (profError) throw profError;
+            if (profError) {
+                console.error('[handleSave] Profiles Update Error:', profError);
+                throw profError;
+            }
 
-            // 2. Update/Upsert Acts Table
+            console.log('[handleSave] Updating acts data in DB...');
+            // 2. Update/Upsert Acts Table (with photos_url)
+            // IMPORTANT: photos_url is an ARRAY in the DB
             const { error: actError } = await supabase
                 .from('acts')
                 .upsert({
                     owner_id: user.id,
                     name: profileData.act_name,
-                    category_id: profileData.category_id,
+                    category_id: profileData.category_id || null, // Ensure null if empty string
                     artist_type: profileData.artist_type,
                     genre: profileData.genre,
-                    description: profileData.bio
+                    description: profileData.bio,
+                    photos_url: finalPhotoUrl ? [finalPhotoUrl] : []
                 }, { onConflict: 'owner_id' });
 
-            if (actError) throw actError;
+            if (actError) {
+                console.error('[handleSave] Acts Update Error:', actError);
+                throw new Error(`Acts Update Error: ${JSON.stringify(actError)}`);
+            }
 
+            console.log('[handleSave] SAVE SUCCESSFUL');
             Alert.alert('Success', 'Profile and Act updated successfully!');
+            setSelectedImage(null);
+            setExistingPhotoUrl(finalPhotoUrl);
         } catch (err: any) {
-            Alert.alert('Error', err.message);
+            console.error('[handleSave] GLOBAL ERROR:', err);
+            // More aggressive error reporting
+            const errorMessage = err.message || JSON.stringify(err);
+            Alert.alert('Error Saving', errorMessage);
         } finally {
             setSaving(false);
+            setIsUploading(false);
         }
     };
 
@@ -249,16 +335,36 @@ export default function UnifiedEditProfile() {
                             placeholderTextColor={COLORS.textDim}
                         />
                     </View>
+
+                    {/* --- PHOTO SECTION --- */}
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Act Photo</Text>
+                        <Pressable style={styles.imagePicker} onPress={pickImage}>
+                            {selectedImage || existingPhotoUrl ? (
+                                <Image
+                                    source={{ uri: selectedImage || existingPhotoUrl! }}
+                                    style={styles.selectedImage}
+                                />
+                            ) : (
+                                <View style={styles.imagePlaceholder}>
+                                    <Star size={24} color={COLORS.textDim} />
+                                    <Text style={styles.imagePlaceholderText}>Choose Photo</Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* --- SAVE BUTTON --- */}
                 <Pressable
-                    style={[styles.saveButton, saving && { opacity: 0.7 }]}
+                    style={[styles.saveButton, (saving || isUploading) && { opacity: 0.7 }]}
                     onPress={handleSave}
-                    disabled={saving}
+                    disabled={saving || isUploading}
                 >
                     {saving ? (
                         <ActivityIndicator color={COLORS.background} />
+                    ) : isUploading ? (
+                        <Text style={styles.saveButtonText}>Subiendo foto...</Text>
                     ) : (
                         <>
                             <Save size={20} color={COLORS.background} />
@@ -337,5 +443,30 @@ const styles = StyleSheet.create({
     modalContent: { backgroundColor: '#1A1A1A', borderRadius: 20, maxHeight: '70%', padding: 24, borderWidth: 1, borderColor: '#333' },
     modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     modalItem: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#222' },
-    modalItemText: { color: COLORS.text, fontSize: 17, textAlign: 'center' }
+    modalItemText: { color: COLORS.text, fontSize: 17, textAlign: 'center' },
+
+    imagePicker: {
+        width: '100%',
+        height: 200,
+        backgroundColor: '#000',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#333',
+        marginTop: 8,
+        overflow: 'hidden',
+    },
+    imagePlaceholder: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    imagePlaceholderText: {
+        color: COLORS.textDim,
+        marginTop: 8,
+    },
+    selectedImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
 });

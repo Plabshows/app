@@ -1,14 +1,16 @@
-import { COLORS, SPACING } from '@/src/constants/theme';
-import { supabase } from '@/src/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Lock, Mail } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../src/constants/theme';
+import { useAuth } from '../src/context/AuthContext';
+import { supabase } from '../src/lib/supabase';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const { refreshAuth } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -27,7 +29,19 @@ export default function LoginScreen() {
             });
 
             if (error) throw error;
-            router.replace('/artist-dashboard' as any);
+
+            // Fetch profile to check role/admin status
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_admin, role')
+                .eq('id', (await supabase.auth.getUser()).data.user?.id)
+                .single();
+
+            if (profile?.is_admin) {
+                router.replace('/admin' as any);
+            } else {
+                router.replace('/artist-dashboard' as any);
+            }
         } catch (error: any) {
             Alert.alert('Login Error', error.message);
         } finally {
@@ -38,7 +52,7 @@ export default function LoginScreen() {
     const handleQuickLogin = async () => {
         setLoading(true);
         console.log('[QuickLogin] Iniciando acceso rápido para Manuel Forner...');
-        const demoEmail = 'artist@manuelforner.com';
+        const demoEmail = 'demo@manuelforner.com';
         const demoPassword = 'manuel_demo_123';
         const demoUserId = '00000000-0000-0000-0000-000000000000';
 
@@ -53,28 +67,36 @@ export default function LoginScreen() {
             if (signInError) {
                 console.log('[QuickLogin] Error de auth estándar:', signInError.message);
 
-                // If rate limited, trigger GHOST MODE
-                if (signInError.message.includes('rate limit')) {
-                    console.log('[QuickLogin] RATE LIMIT detectado. ACTIVANDO GHOST MODE...');
-                    await AsyncStorage.setItem('GHOST_AUTH_USER_ID', demoUserId);
-                    router.replace('/artist-dashboard' as any);
-                    return;
-                }
-
-                // Also trigger ghost mode if user not found (as a super-resilient fallback)
-                console.log('[QuickLogin] Fallback: Utilizando GHOST MODE para asegurar acceso móvil/web.');
+                // If rate limited or fail, trigger GHOST MODE
+                console.log('[QuickLogin] Usando GHOST MODE...');
                 await AsyncStorage.setItem('GHOST_AUTH_USER_ID', demoUserId);
-                router.replace('/artist-dashboard' as any);
+                await AsyncStorage.setItem('GHOST_IS_ADMIN', 'false');
+
+                // SYNC AUTH STATE
+                await refreshAuth();
+
+                router.replace('/artist-dashboard');
                 return;
             }
 
+            // Sync auth state before check
+            await refreshAuth();
+
             // Normal flow if auth works
-            router.replace('/artist-dashboard' as any);
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', signInData.user?.id)
+                .single();
+
+            router.replace(profile?.is_admin ? '/admin' : '/artist-dashboard');
 
         } catch (error: any) {
             console.error('[QuickLogin] ERROR:', error.message);
             // Even on unexpected error, try ghost mode as last resort
             await AsyncStorage.setItem('GHOST_AUTH_USER_ID', demoUserId);
+            await AsyncStorage.setItem('GHOST_IS_ADMIN', 'false');
+            await refreshAuth();
             router.replace('/artist-dashboard' as any);
         } finally {
             setLoading(false);
@@ -164,6 +186,21 @@ export default function LoginScreen() {
                         >
                             <Text style={styles.quickLoginButtonText}>Login as Manuel Forner (Demo)</Text>
                         </Pressable>
+
+                        {/* Admin Entry Shortcut - THE BACKDOOR */}
+                        <Pressable
+                            style={styles.adminShortcut}
+                            onPress={async () => {
+                                console.log('[Backdoor] ACTIVATING GHOST ADMIN MODE...');
+                                const adminId = 'admin-ghost-999';
+                                await AsyncStorage.setItem('GHOST_AUTH_USER_ID', adminId);
+                                await AsyncStorage.setItem('GHOST_IS_ADMIN', 'true');
+                                await refreshAuth();
+                                router.replace('/admin');
+                            }}
+                        >
+                            <Text style={styles.adminShortcutText}>🛡️ Acceso Administrador (Directo)</Text>
+                        </Pressable>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -229,5 +266,19 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    adminShortcut: {
+        marginTop: 32,
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: 'rgba(255, 149, 0, 0.05)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 149, 0, 0.2)',
+    },
+    adminShortcutText: {
+        color: '#FF9500',
+        fontWeight: '700',
+        fontSize: 14,
     }
 });

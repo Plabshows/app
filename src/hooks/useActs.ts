@@ -2,17 +2,35 @@ import { useEffect, useState } from 'react';
 import { ACTS as MOCK_ACTS } from '../data/mock';
 import { supabase } from '../lib/supabase';
 
+export interface Act {
+    id: string;
+    name: string;
+    title?: string;
+    category: string;
+    image_url: string;
+    video_url?: string;
+    location?: string;
+    description?: string;
+    technical_specs?: string;
+    specs?: string;
+    price_guide?: string;
+    price_range?: string;
+    owner_id: string;
+    is_published: boolean;
+    created_at: string;
+}
+
 export function useActs() {
     // Initialize with mock data to prevent 'never[]' type inference issues and show data immediately
-    const [acts, setActs] = useState(MOCK_ACTS);
+    const [acts, setActs] = useState<Act[]>(MOCK_ACTS as any);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<any>(null);
 
     useEffect(() => {
         fetchActs();
     }, []);
 
-    async function fetchActs(filters = {}) {
+    async function fetchActs(filters: { query?: string; category?: string } = {}) {
         const { query, category } = filters;
         try {
             setLoading(true);
@@ -23,7 +41,7 @@ export function useActs() {
                 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
             if (!isSupabaseConfigured) {
-                setActs(MOCK_ACTS);
+                setActs(MOCK_ACTS as any);
                 return;
             }
 
@@ -34,10 +52,8 @@ export function useActs() {
 
             if (category) {
                 // Filter by category name (joined column)
-                // Note: categories is a joined table, we use dot notation for filtering nested data if supported,
-                // otherwise we filter on acts.category_id after fetching or use a join-aware filter.
-                // In Supabase, filtering on a joined table's column:
-                supabaseQuery = supabaseQuery.filter('categories.name', 'eq', category);
+                // Note: In Supabase, filtering on a joined table's column:
+                supabaseQuery = supabaseQuery.filter('category.name', 'eq', category);
             }
 
             if (query) {
@@ -47,13 +63,13 @@ export function useActs() {
             const { data, error } = await supabaseQuery;
 
             if (data && data.length > 0) {
-                const mappedData = data.map(act => ({
+                const mappedData = data.map((act: any) => ({
                     ...act,
                     category: act.category?.name || 'Uncategorized'
                 }));
                 setActs(mappedData);
             } else if (!query && !category) {
-                setActs(MOCK_ACTS);
+                setActs(MOCK_ACTS as any);
             } else {
                 setActs([]); // No results for the filter
             }
@@ -64,7 +80,7 @@ export function useActs() {
         } catch (e) {
             console.error('Error fetching acts:', e);
             setError(e);
-            setActs(MOCK_ACTS);
+            setActs(MOCK_ACTS as any);
         } finally {
             setLoading(false);
         }

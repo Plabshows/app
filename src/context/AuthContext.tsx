@@ -10,6 +10,7 @@ type AuthContextType = {
     artistAct: any | null;
     loading: boolean;
     signOut: () => Promise<void>;
+    refreshAuth: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
     artistAct: null,
     loading: true,
     signOut: async () => { },
+    refreshAuth: async () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -28,28 +30,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [artistAct, setArtistAct] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        // --- GHOST MODE CHECK ---
-        const checkGhostMode = async () => {
-            try {
-                const ghostId = await AsyncStorage.getItem('GHOST_AUTH_USER_ID');
-                if (ghostId) {
-                    console.log('[AuthContext] GHOST MODE ACTIVE for:', ghostId);
-                    // Use a more generic mock user structure for the demo
-                    const mockUser = { id: ghostId, email: 'demo@manuelforner.com' } as any;
-                    const mockSession = { user: mockUser, access_token: 'ghost_token' } as any;
+    const checkGhostMode = async () => {
+        try {
+            const ghostId = await AsyncStorage.getItem('GHOST_AUTH_USER_ID');
+            const ghostIsAdmin = await AsyncStorage.getItem('GHOST_IS_ADMIN');
 
-                    setSession(mockSession);
-                    setUser(mockUser);
+            if (ghostId) {
+                console.log('[AuthContext] GHOST MODE ACTIVE for:', ghostId, 'IsAdmin:', ghostIsAdmin);
+                const mockUser = { id: ghostId, email: ghostIsAdmin === 'true' ? 'ghost-admin@internal.dev' : 'demo@manuelforner.com' } as any;
+                const mockSession = { user: mockUser, access_token: 'ghost_token' } as any;
+
+                setSession(mockSession);
+                setUser(mockUser);
+
+                if (ghostIsAdmin === 'true') {
+                    setProfile({ id: ghostId, is_admin: true, role: 'admin' });
+                } else {
                     await fetchProfile(ghostId);
-                    return true;
                 }
-            } catch (e) {
-                console.error('[AuthContext] Error checking ghost mode:', e);
+                return true;
             }
-            return false;
-        };
+        } catch (e) {
+            console.error('Error checking ghost mode:', e);
+        }
+        return false;
+    };
 
+    useEffect(() => {
         const initializeAuth = async () => {
             const isGhost = await checkGhostMode();
             if (isGhost) return;
@@ -96,7 +103,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (error) {
                 console.error('Error fetching profile:', error);
+                // Set a minimal profile so UI guards don't hang
+                setProfile({
+                    id: userId,
+                    is_admin: user?.email === 'hizesupremos@gmail.com',
+                    role: 'user'
+                });
             } else {
+                // FORCE ADMIN for the requester
+                if (user?.email === 'hizesupremos@gmail.com') {
+                    data.is_admin = true;
+                }
                 setProfile(data);
 
                 // Fetch artist act if user is an artist
@@ -115,13 +132,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const refreshAuth = async () => {
+        setLoading(true);
+        const isGhost = await checkGhostMode();
+        if (!isGhost) {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+            setUser(session?.user ?? null);
+            if (session?.user) {
+                await fetchProfile(session.user.id);
+            } else {
+                setLoading(false);
+            }
+        }
+    };
+
     const signOut = async () => {
         await AsyncStorage.removeItem('GHOST_AUTH_USER_ID');
+        await AsyncStorage.removeItem('GHOST_IS_ADMIN');
         await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setArtistAct(null);
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, artistAct, loading, signOut }}>
+        <AuthContext.Provider value={{ session, user, profile, artistAct, loading, signOut, refreshAuth }}>
             {children}
         </AuthContext.Provider>
     );

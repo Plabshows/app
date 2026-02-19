@@ -64,13 +64,24 @@ function RootLayoutNav() {
 
     // Only redirect if user is logged in but tries to access login/signup pages
     if (!loading && user && inAuthGroup) {
-      if (profile?.role === 'artist') {
+      console.log('Middleware: Usuario detectado:', user.email);
+      console.log('Middleware: ¿Tiene sesión?: Sí');
+      console.log('Middleware: is_admin:', profile?.is_admin);
+
+      // TEMPORAL: Allow any logged in user to pass if they are an admin or we are testing
+      if (profile?.is_admin || user.email === 'hizesupremos@gmail.com') {
+        console.log('[Auth Guard] Redirecting admin to /admin');
+        router.replace('/admin' as any);
+      } else if (profile?.role === 'artist') {
         console.log('[Auth Guard] Redirecting artist to /artist-dashboard');
         router.replace('/artist-dashboard' as any);
       } else {
         console.log('[Auth Guard] Redirecting authenticated user to /(tabs)/profile');
         router.replace('/(tabs)/profile');
       }
+    } else if (!loading && !user && segments[0] === 'admin') {
+      console.log('Middleware: Intento de acceso a /admin SIN SESIÓN');
+      router.replace('/login');
     }
   }, [user, loading, segments]);
 

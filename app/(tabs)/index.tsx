@@ -37,17 +37,18 @@ const { width } = Dimensions.get('window');
 
 const TOP_CATEGORIES = [
   { id: 'musician', name: 'Musician', icon: Music },
-  { id: 'magician', name: 'Magic', icon: Wand },
-  { id: 'fire_flow', name: 'Fire & Flow', icon: Flame },
+  { id: 'dj', name: 'DJ', icon: Disc },
+  { id: 'magic', name: 'Magic', icon: Wand },
   { id: 'dancer', name: 'Dancer', icon: Users },
   { id: 'circus', name: 'Circus', icon: Ghost },
   { id: 'specialty_act', name: 'Specialty Act', icon: Star },
+  { id: 'fire_flow', name: 'Fire & Flow', icon: Flame },
+  { id: 'presenter', name: 'Presenter', icon: Mic },
   { id: 'comedian', name: 'Comedian', icon: Mic },
-  { id: 'roaming', name: 'Roaming', icon: Users },
 ];
 
 const BOTTOM_CATEGORIES = [
-  'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian', 'Roaming'
+  'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian'
 ];
 
 const CATEGORY_ICONS = {
@@ -84,7 +85,7 @@ export default function DiscoverScreen() {
   // --- REAL-TIME SEARCH & FILTER LOGIC ---
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      refetch({ query: searchQuery, category: activeCategory });
+      refetch({ query: searchQuery, category: activeCategory || undefined });
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
@@ -144,7 +145,7 @@ export default function DiscoverScreen() {
           <Pressable
             key={cat.id}
             style={[styles.topNavItem, activeCategory === cat.name && styles.activeTopNavItem]}
-            onPress={() => setActiveCategory(activeCategory === cat.name ? null : cat.name)}
+            onPress={() => router.push(`/(tabs)/search?category=${encodeURIComponent(cat.name)}`)}
           >
             <cat.icon size={24} color={activeCategory === cat.name ? COLORS.primary : COLORS.textDim} strokeWidth={1.5} />
             <Text style={[styles.topNavText, activeCategory === cat.name && styles.activeTopNavText]}>{cat.name}</Text>
@@ -243,7 +244,7 @@ export default function DiscoverScreen() {
             <Pressable
               key={index}
               style={[styles.categoryCard, activeCategory === cat && styles.activeCategoryCard]}
-              onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
+              onPress={() => router.push(`/(tabs)/search?category=${encodeURIComponent(cat)}`)}
             >
               <View style={[styles.categoryIconContainer, activeCategory === cat && styles.activeCategoryIconContainer]}>
                 <IconComponent size={24} color={activeCategory === cat ? COLORS.background : COLORS.primary} />

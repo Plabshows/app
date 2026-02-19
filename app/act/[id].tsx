@@ -32,7 +32,7 @@ export default function ActDetail() {
             {/* Hero Section */}
             <View style={styles.hero}>
                 <Video
-                    source={{ uri: act.video_url }}
+                    source={{ uri: act.video_url || '' }}
                     style={styles.video}
                     resizeMode={ResizeMode.COVER}
                     isLooping

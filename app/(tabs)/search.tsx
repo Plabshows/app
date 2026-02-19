@@ -5,7 +5,9 @@ import { Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-const CATEGORIES = ['All', 'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian', 'Roaming'];
+const CATEGORIES = ['All', 'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian'];
+
+import { Act } from '@/src/hooks/useActs';
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -19,17 +21,14 @@ export default function SearchScreen() {
       setSearchQuery(params.query as string);
     }
     if (params.category) {
-      const paramCat = (params.category as string).toLowerCase();
-      // Try to find exact match or singular/plural match
-      const cat = CATEGORIES.find(c => {
-        const cLower = c.toLowerCase();
-        return cLower === paramCat || cLower.includes(paramCat) || paramCat.includes(cLower);
-      });
+      const paramCat = params.category as string;
+      // Precise selection for official categories
+      const cat = CATEGORIES.find(c => c === paramCat);
       if (cat) setSelectedCategory(cat);
     }
   }, [params.category, params.query]);
 
-  const filteredActs = acts.filter(act => {
+  const filteredActs = (acts as Act[]).filter(act => {
     const matchesSearch = (act.name || act.title || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' ||
       act.category === selectedCategory ||
@@ -37,16 +36,16 @@ export default function SearchScreen() {
     return matchesSearch && matchesCategory;
   });
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item }: { item: Act }) => (
     <Pressable
       style={styles.card}
       onPress={() => router.push(`/act/${item.id}`)}
     >
-      <Image source={{ uri: item.image_url }} style={styles.cardImage} />
+      <Image source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} style={styles.cardImage} />
       <View style={styles.cardContent}>
         <Text style={styles.cardCategory}>{item.category}</Text>
         <Text style={styles.cardTitle}>{item.name || item.title}</Text>
-        <Text style={styles.cardPrice}>{item.price_guide || item.price_range}</Text>
+        <Text style={styles.cardPrice}>{item.price_guide || item.price_range || 'Contact for price'}</Text>
       </View>
     </Pressable>
   );

@@ -1,10 +1,10 @@
-import { COLORS, SPACING } from '@/src/constants/theme';
-import { useAuth } from '@/src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { ChevronRight, LogOut, Settings, User, UserPlus } from 'lucide-react-native';
 import React from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../../src/constants/theme';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -69,6 +69,26 @@ export default function ProfileScreen() {
                         <Text style={styles.email}>{session?.user?.email}</Text>
                     </View>
                 </View>
+
+                {/* Section: Admin Hub (Conditional or Forced for Debug) */}
+                {(profile?.is_admin || user?.email === 'hizesupremos@gmail.com') && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: '#FF9500' }]}>Control Total (Admin)</Text>
+                        <Pressable
+                            style={[styles.menuItem, { borderColor: '#FF9500', borderWidth: 2 }]}
+                            onPress={() => router.push('/admin' as any)}
+                        >
+                            <View style={[styles.menuIconBox, { backgroundColor: 'rgba(255, 149, 0, 0.2)' }]}>
+                                <Settings size={22} color="#FF9500" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.menuText, { color: '#FF9500' }]}>ENTRAR AL PANEL ADMIN</Text>
+                                <Text style={styles.menuSubtext}>Acceso directo sin restricciones</Text>
+                            </View>
+                            <ChevronRight size={20} color="#FF9500" />
+                        </Pressable>
+                    </View>
+                )}
 
                 {/* Section: Artist Actions */}
                 <View style={styles.section}>
