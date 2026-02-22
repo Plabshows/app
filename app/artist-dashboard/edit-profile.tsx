@@ -41,7 +41,8 @@ export default function UnifiedEditProfile() {
         category_id: '',
         artist_type: '',
         genre: '',
-        bio: ''
+        bio: '',
+        price_guide: ''
     });
 
     const [modalVisible, setModalVisible] = useState(false);
@@ -82,7 +83,8 @@ export default function UnifiedEditProfile() {
                 category_id: act?.category_id || '',
                 artist_type: act?.artist_type || '',
                 genre: act?.genre || '',
-                bio: act?.description || ''
+                bio: act?.description || '',
+                price_guide: act?.price_guide || ''
             });
 
             // Ensure existingPhotoUrl is a string (the first photo)
@@ -123,97 +125,91 @@ export default function UnifiedEditProfile() {
             return Alert.alert('Incomplete Form', 'Please fill in the required fields highlighted in red.');
         }
 
+        // TAREA 2.1: Estado de Carga
         setSaving(true);
         console.log('[handleSave] Starting save process...');
+
         try {
             if (!user) throw new Error('No user found');
 
             let finalPhotoUrl = existingPhotoUrl;
 
-            // 1. Detección de Imagen & Subida
+            // TAREA 2.2: Subida de Imagen (Si cambió)
             if (selectedImage) {
-                console.log('[handleSave] New image detected, starting upload:', selectedImage);
+                console.log('[handleSave] New image detected, starting upload...');
                 setIsUploading(true);
+
                 const fileExt = selectedImage.split('.').pop();
-                const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-                const filePath = fileName;
+                const filePath = `${user.id}/${Date.now()}_avatar.${fileExt}`;
 
                 try {
-                    // Blob-based upload for reliable cross-platform support
                     const response = await fetch(selectedImage);
                     const blob = await response.blob();
 
-                    console.log('[handleSave] Uploading to storage bucket...');
                     const { data: uploadData, error: uploadError } = await supabase.storage
-                        .from('artist-portfolio')
+                        .from('media')
                         .upload(filePath, blob, {
                             contentType: `image/${fileExt}`,
-                            upsert: true
+                            upsert: true // Crucial per user request
                         });
 
                     if (uploadError) throw uploadError;
-                    console.log('[handleSave] Upload successful:', uploadData);
 
-                    // 2. Obtención de URL Pública
                     const { data: { publicUrl } } = supabase.storage
-                        .from('artist-portfolio')
+                        .from('media')
                         .getPublicUrl(filePath);
 
                     finalPhotoUrl = publicUrl;
-                    console.log('[handleSave] Public URL obtained:', finalPhotoUrl);
+                    console.log('[handleSave] Upload successful, public URL:', finalPhotoUrl);
                 } catch (uploadErr: any) {
-                    console.error('[handleSave] Upload Step Error:', uploadErr);
-                    throw new Error(`Failed to upload image: ${uploadErr.message}`);
+                    console.error('[handleSave] Upload Error:', uploadErr);
+                    throw new Error(`Failed to upload photo: ${uploadErr.message}`);
                 } finally {
                     setIsUploading(false);
                 }
             }
 
-            console.log('[handleSave] Updating profile data in DB...');
-            // 1. Update Profiles Table
+            // TAREA 2.3: Actualización de Datos (SQL Update)
+            console.log('[handleSave] Updating database records...');
+
+            // 1. Profiles Table
             const { error: profError } = await supabase
                 .from('profiles')
                 .update({
                     name: profileData.full_name,
                     city: profileData.city,
-                    country: profileData.country
+                    country: profileData.country,
+                    avatar_url: finalPhotoUrl
                 })
                 .eq('id', user.id);
 
-            if (profError) {
-                console.error('[handleSave] Profiles Update Error:', profError);
-                throw profError;
-            }
+            if (profError) throw profError;
 
-            console.log('[handleSave] Updating acts data in DB...');
-            // 2. Update/Upsert Acts Table (with photos_url)
-            // IMPORTANT: photos_url is an ARRAY in the DB
+            // 2. Acts Table
             const { error: actError } = await supabase
                 .from('acts')
                 .upsert({
                     owner_id: user.id,
                     name: profileData.act_name,
-                    category_id: profileData.category_id || null, // Ensure null if empty string
+                    category_id: profileData.category_id || null,
                     artist_type: profileData.artist_type,
                     genre: profileData.genre,
                     description: profileData.bio,
+                    price_guide: profileData.price_guide,
                     photos_url: finalPhotoUrl ? [finalPhotoUrl] : []
                 }, { onConflict: 'owner_id' });
 
-            if (actError) {
-                console.error('[handleSave] Acts Update Error:', actError);
-                throw new Error(`Acts Update Error: ${JSON.stringify(actError)}`);
-            }
+            if (actError) throw actError;
 
+            // TAREA 2.4: Manejo de Éxito
             console.log('[handleSave] SAVE SUCCESSFUL');
-            Alert.alert('Success', 'Profile and Act updated successfully!');
+            Alert.alert('Success', 'Your profile has been updated!');
             setSelectedImage(null);
             setExistingPhotoUrl(finalPhotoUrl);
         } catch (err: any) {
+            // TAREA 2.4: Manejo de Errores
             console.error('[handleSave] GLOBAL ERROR:', err);
-            // More aggressive error reporting
-            const errorMessage = err.message || JSON.stringify(err);
-            Alert.alert('Error Saving', errorMessage);
+            Alert.alert('Error Saving', err.message || JSON.stringify(err));
         } finally {
             setSaving(false);
             setIsUploading(false);
@@ -322,6 +318,35 @@ export default function UnifiedEditProfile() {
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>
                         </View>
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Base Net Fee (What you earn in AED)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={profileData.price_guide}
+                            onChangeText={t => setProfileData({ ...profileData, price_guide: t })}
+                            placeholder="e.g. 1000"
+                            placeholderTextColor={COLORS.textDim}
+                            keyboardType="numeric"
+                        />
+                        {(() => {
+                            const rawValue = parseInt(String(profileData.price_guide).replace(/[^0-9]/g, ''), 10);
+                            if (!isNaN(rawValue) && rawValue > 0) {
+                                const platformFee = Math.round(rawValue * 0.20);
+                                const publicPrice = rawValue + platformFee;
+                                return (
+                                    <View style={styles.pricingBox}>
+                                        <Text style={styles.pricingText}>✅ Your Net Earning: <Text style={{ fontWeight: 'bold' }}>{rawValue.toLocaleString()} AED</Text></Text>
+                                        <Text style={styles.pricingTextDim}>⚖️ Platform Fee (20%): {platformFee.toLocaleString()} AED</Text>
+                                        <View style={styles.divider} />
+                                        <Text style={styles.pricingTextBold}>👀 Public Profile Price (What clients see & pay): {publicPrice.toLocaleString()} AED</Text>
+                                    </View>
+                                );
+                            }
+                            return null;
+                        })()}
+                        <Text style={styles.helpText}>Enter your desired take-home amount. We automatically add a 20% platform fee to the final public price.</Text>
                     </View>
 
                     <View style={styles.field}>
@@ -468,5 +493,40 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
+    },
+    pricingBox: {
+        backgroundColor: '#1A1A1A',
+        padding: 15,
+        borderRadius: 10,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#333'
+    },
+    pricingText: {
+        color: COLORS.text,
+        fontSize: 14,
+        marginBottom: 6
+    },
+    pricingTextDim: {
+        color: COLORS.textDim,
+        fontSize: 14,
+        marginBottom: 8
+    },
+    pricingTextBold: {
+        color: '#10B981',
+        fontSize: 15,
+        fontWeight: 'bold',
+        marginTop: 8
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#333',
+        marginVertical: 4
+    },
+    helpText: {
+        color: COLORS.textDim,
+        fontSize: 12,
+        marginTop: 10,
+        fontStyle: 'italic'
     },
 });

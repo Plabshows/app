@@ -110,7 +110,7 @@ export default function ProfileScreen() {
                     ) : (
                         <Pressable
                             style={styles.menuItem}
-                            onPress={() => router.push('/artist-onboarding' as any)}
+                            onPress={() => router.push('/artist-onboarding?mode=signup' as any)}
                         >
                             <View style={styles.menuIconBox}>
                                 <UserPlus size={22} color={COLORS.primary} />

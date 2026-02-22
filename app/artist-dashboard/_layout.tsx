@@ -146,7 +146,7 @@ export default function DashboardLayout() {
                                             style: 'destructive',
                                             onPress: async () => {
                                                 await supabase.auth.signOut();
-                                                router.replace('/login' as any);
+                                                router.push('/' as any);
                                             }
                                         }
                                     ]

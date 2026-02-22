@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -30,38 +29,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [artistAct, setArtistAct] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const checkGhostMode = async () => {
-        try {
-            const ghostId = await AsyncStorage.getItem('GHOST_AUTH_USER_ID');
-            const ghostIsAdmin = await AsyncStorage.getItem('GHOST_IS_ADMIN');
-
-            if (ghostId) {
-                console.log('[AuthContext] GHOST MODE ACTIVE for:', ghostId, 'IsAdmin:', ghostIsAdmin);
-                const mockUser = { id: ghostId, email: ghostIsAdmin === 'true' ? 'ghost-admin@internal.dev' : 'demo@manuelforner.com' } as any;
-                const mockSession = { user: mockUser, access_token: 'ghost_token' } as any;
-
-                setSession(mockSession);
-                setUser(mockUser);
-
-                if (ghostIsAdmin === 'true') {
-                    setProfile({ id: ghostId, is_admin: true, role: 'admin' });
-                } else {
-                    await fetchProfile(ghostId);
-                }
-                return true;
-            }
-        } catch (e) {
-            console.error('Error checking ghost mode:', e);
-        }
-        return false;
-    };
-
     useEffect(() => {
         const initializeAuth = async () => {
-            const isGhost = await checkGhostMode();
-            if (isGhost) return;
-
-            // Get initial session if not in ghost mode
             const { data: { session } } = await supabase.auth.getSession();
             setSession(session);
             setUser(session?.user ?? null);
@@ -110,10 +79,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     role: 'user'
                 });
             } else {
-                // FORCE ADMIN for the requester
-                if (user?.email === 'hizesupremos@gmail.com') {
-                    data.is_admin = true;
-                }
                 setProfile(data);
 
                 // Fetch artist act if user is an artist
@@ -134,22 +99,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const refreshAuth = async () => {
         setLoading(true);
-        const isGhost = await checkGhostMode();
-        if (!isGhost) {
-            const { data: { session } } = await supabase.auth.getSession();
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                await fetchProfile(session.user.id);
-            } else {
-                setLoading(false);
-            }
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+            await fetchProfile(session.user.id);
+        } else {
+            setLoading(false);
         }
     };
 
     const signOut = async () => {
-        await AsyncStorage.removeItem('GHOST_AUTH_USER_ID');
-        await AsyncStorage.removeItem('GHOST_IS_ADMIN');
         await supabase.auth.signOut();
         setSession(null);
         setUser(null);

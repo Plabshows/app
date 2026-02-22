@@ -13,8 +13,8 @@ export {
 } from 'expo-router';
 
 import { useRouter, useSegments } from 'expo-router';
+import Toast from 'react-native-toast-message';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
-
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -97,6 +97,7 @@ function RootLayoutNav() {
         <Stack.Screen name="act/[id]" options={{ presentation: 'card', headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
+      <Toast />
     </ThemeProvider>
   );
 }

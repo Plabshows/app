@@ -1,0 +1,208 @@
+﻿diff --git a/app/artist-onboarding/index.tsx b/app/artist-onboarding/index.tsx
+index a944a4d..3ef6c23 100644
+--- a/app/artist-onboarding/index.tsx
++++ b/app/artist-onboarding/index.tsx
+@@ -1,5 +1,5 @@
+ 
+-import { COLORS, SPACING } from '@/src/constants/theme';
++import { COLORS } from '@/src/constants/theme';
+ import { supabase } from '@/src/lib/supabase';
+ import * as ImagePicker from 'expo-image-picker';
+ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+@@ -23,7 +23,6 @@ import {
+     Platform,
+     Pressable,
+     ScrollView,
+-    StyleSheet,
+     Text,
+     TextInput,
+     View
+@@ -43,7 +42,7 @@ const LISTS = {
+     setupTimes: ['None', '15 mins', '30 mins', '1 hour', '2 hours', '3 hours +'],
+ };
+ 
+-type Step = 'invite' | 'auth' | 'identity' | 'performance' | 'logistics' | 'media' | 'commercials' | 'success';
++type Step = 'auth' | 'identity' | 'performance' | 'logistics' | 'media' | 'commercials' | 'success';
+ 
+ export default function ArtistOnboarding() {
+     const router = useRouter();
+@@ -51,10 +50,10 @@ export default function ArtistOnboarding() {
+ 
+     // State
+     const [authMode, setAuthMode] = useState<'login' | 'signup'>((mode as 'login' | 'signup') || 'signup');
+-    const [currentStep, setCurrentStep] = useState<Step>(mode ? 'auth' : 'invite');
++    const [currentStep, setCurrentStep] = useState<Step>('auth');
+     const [loading, setLoading] = useState(false);
+     const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
+-    const [inviteCode, setInviteCode] = useState('');
++
+     const [email, setEmail] = useState('');
+     const [password, setPassword] = useState('');
+ 
+@@ -108,7 +107,18 @@ export default function ArtistOnboarding() {
+     }, []);
+ 
+     const checkSession = async () => {
+-        const { data: { session } } = await supabase.auth.getSession();
++        // 1. FORCED SESSION CLEANUP (Bypass Corrupt Cache)
++        // Dispara un signOut sutil antes de checar la sesi├│n activa real 
++        // para prevenir loops raros con RefreshTokens vencidos en Ghost Mode.
++        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
++
++        if (sessionError) {
++            console.log("Corrupt session detected, clearing storage.");
++            await supabase.auth.signOut();
++            setCurrentStep('auth');
++            return;
++        }
++
+         if (session?.user) {
+             // If already logged in, check for act
+             const { data: existingAct } = await supabase
+@@ -118,6 +128,7 @@ export default function ArtistOnboarding() {
+                 .maybeSingle();
+ 
+             if (existingAct) {
++                // Happy Path - Enrutando al dashboard exacto.
+                 router.replace('/artist-dashboard/edit-profile');
+             } else if (currentStep === 'auth') {
+                 setCurrentStep('identity');
+@@ -137,7 +148,7 @@ export default function ArtistOnboarding() {
+     const [modalTargetField, setModalTargetField] = useState<keyof typeof formData | null>(null);
+ 
+     // Constants
+-    const INVITE_CODE = '2222';
++
+ 
+     // --- HANDLERS ---
+ 
+@@ -158,10 +169,7 @@ export default function ArtistOnboarding() {
+         setModalVisible(false);
+     };
+ 
+-    const handleInviteSubmit = () => {
+-        if (inviteCode.toUpperCase() === INVITE_CODE) setCurrentStep('auth');
+-        else Alert.alert('Invalid Code', 'Access denied.');
+-    };
++
+ 
+     const handleAuth = async () => {
+         if (!email || !password) return Alert.alert('Error', 'Missing credentials');
+@@ -569,7 +577,7 @@ export default function ArtistOnboarding() {
+                     <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.text, letterSpacing: 1 }}>
+                         PERFORMANCE LAB
+                     </Text>
+-                    {currentStep !== 'invite' && currentStep !== 'success' && currentStep !== 'auth' && (
++                    {currentStep !== 'success' && currentStep !== 'auth' && (
+                         <Text style={styles.stepIndicator}>
+                             Step {['identity', 'performance', 'logistics', 'media', 'commercials'].indexOf(currentStep) + 1}/5
+                         </Text>
+@@ -577,21 +585,7 @@ export default function ArtistOnboarding() {
+                 </View>
+ 
+                 {/* Steps */}
+-                {currentStep === 'invite' && (
+-                    <View style={styles.centerContainer}>
+-                        <Text style={styles.title}>Artist Portal</Text>
+-                        <Text style={styles.subtitle}>Enter Invitation Code</Text>
+-                        <TextInput
+-                            style={styles.input}
+-                            value={inviteCode}
+-                            onChangeText={setInviteCode}
+-                            placeholder="CODE"
+-                            placeholderTextColor={COLORS.textDim}
+-                            autoCapitalize="characters"
+-                        />
+-                        <Pressable style={styles.button} onPress={handleInviteSubmit}><Text style={styles.buttonText}>Enter</Text></Pressable>
+-                    </View>
+-                )}
++
+ 
+                 {currentStep === 'auth' && (
+                     <View style={styles.centerContainer}>
+@@ -701,84 +695,4 @@ export default function ArtistOnboarding() {
+     );
+ }
+ 
+-const styles = StyleSheet.create({
+-    container: { flex: 1, backgroundColor: COLORS.background },
+-    header: {
+-        padding: SPACING.m,
+-        flexDirection: 'row',
+-        justifyContent: 'space-between',
+-        alignItems: 'center',
+-        borderBottomWidth: 1,
+-        borderBottomColor: '#222'
+-    },
+-    stepIndicator: { color: COLORS.primary, fontWeight: 'bold' },
+-    centerContainer: { flex: 1, justifyContent: 'center', padding: SPACING.l },
+-    scrollStep: { padding: SPACING.m, paddingBottom: 100 },
+-
+-    stepHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.l },
+-    iconBox: {
+-        width: 40, height: 40, borderRadius: 20,
+-        backgroundColor: 'rgba(204, 255, 0, 0.1)',
+-        justifyContent: 'center', alignItems: 'center', marginRight: 12
+-    },
+-    stepTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.text },
+-
+-    label: { color: COLORS.textDim, marginBottom: 8, fontSize: 12, textTransform: 'uppercase', fontWeight: 'bold' },
+-    input: {
+-        backgroundColor: '#1E1E1E', color: COLORS.text, padding: 16, borderRadius: 8,
+-        marginBottom: 20, fontSize: 16, borderWidth: 1, borderColor: '#333'
+-    },
+-    dropdownBox: {
+-        backgroundColor: '#1E1E1E', padding: 16, borderRadius: 8,
+-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+-        borderWidth: 1, borderColor: '#333'
+-    },
+-    dropdownText: { fontSize: 16, color: COLORS.text },
+-
+-    row: { flexDirection: 'row', marginBottom: 10 },
+-
+-    button: {
+-        backgroundColor: COLORS.primary, padding: 16, borderRadius: 8,
+-        alignItems: 'center', minWidth: 120
+-    },
+-    buttonFlex: { flex: 1 },
+-    buttonText: { color: COLORS.background, fontWeight: 'bold', fontSize: 16 },
+-    buttonRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+-    backButton: {
+-        backgroundColor: '#1E1E1E', padding: 16, borderRadius: 8, justifyContent: 'center'
+-    },
+-
+-    title: { fontSize: 32, fontWeight: 'bold', color: COLORS.text, marginBottom: 10, textAlign: 'center' },
+-    subtitle: { fontSize: 16, color: COLORS.textDim, marginBottom: 30, textAlign: 'center' },
+-
+-    textArea: { height: 100, textAlignVertical: 'top' },
+-    textAreaLarge: { height: 150, textAlignVertical: 'top' },
+-
+-    authToggle: {
+-        flexDirection: 'row',
+-        backgroundColor: '#111',
+-        borderRadius: 8,
+-        padding: 4,
+-        marginBottom: 24,
+-        borderWidth: 1,
+-        borderColor: '#222'
+-    },
+-    toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },
+-    toggleBtnActive: { backgroundColor: COLORS.primary },
+-    toggleText: { color: COLORS.textDim, fontWeight: 'bold' },
+-    toggleTextActive: { color: COLORS.background },
+-
+-    photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+-    photoContainer: { width: 100, height: 100, borderRadius: 8, overflow: 'hidden' },
+-    photoThumbnail: { width: '100%', height: '100%' },
+-    removePhoto: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', padding: 4, borderRadius: 10 },
+-    addPhoto: { width: 100, height: 100, borderRadius: 8, borderWidth: 2, borderColor: '#333', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
+-    addPhotoText: { color: COLORS.textDim, marginTop: 4, fontSize: 12 },
+-
+-    // Modal
+-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 },
+-    modalContent: { backgroundColor: '#1E1E1E', borderRadius: 12, maxHeight: '60%', padding: 20 },
+-    modalTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+-    modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#333', flexDirection: 'row', justifyContent: 'space-between' },
+-    modalItemText: { color: COLORS.textDim, fontSize: 16 }
+-});
++

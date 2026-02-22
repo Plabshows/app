@@ -1,7 +1,8 @@
-
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
+import { zodResolver } from '@hookform/resolvers/zod';
 import React, { useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import {
     ActivityIndicator,
     Alert,
@@ -12,11 +13,35 @@ import {
     TextInput,
     View
 } from 'react-native';
+import Toast from 'react-native-toast-message';
+import { z } from 'zod';
+
+const basicInfoSchema = z.object({
+    name: z.string().min(1, 'Full name is required'),
+    city: z.string().min(1, 'City is required'),
+    country: z.string().min(1, 'Country is required')
+});
+
+type BasicInfoFormValues = z.infer<typeof basicInfoSchema>;
 
 export default function BasicInfo() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [profile, setProfile] = useState({ name: '', email: '', city: '', country: '' });
+    const [email, setEmail] = useState('');
+
+    const {
+        control,
+        handleSubmit,
+        reset,
+        formState: { errors }
+    } = useForm<BasicInfoFormValues>({
+        resolver: zodResolver(basicInfoSchema),
+        defaultValues: {
+            name: '',
+            city: '',
+            country: ''
+        }
+    });
 
     useEffect(() => {
         fetchProfile();
@@ -30,47 +55,44 @@ export default function BasicInfo() {
                 .select('*')
                 .eq('id', user.id)
                 .single();
-            if (data) setProfile({
-                name: data.name || '',
-                email: data.email || user.email || '',
-                city: data.city || '',
-                country: data.country || ''
-            });
+            if (data) {
+                reset({
+                    name: data.name || '',
+                    city: data.city || '',
+                    country: data.country || ''
+                });
+                setEmail(data.email || user.email || '');
+            }
         }
         setLoading(false);
     };
 
-    const [errors, setErrors] = useState<string[]>([]);
-
-    const validate = () => {
-        const newErrors: string[] = [];
-        if (!profile.name) newErrors.push('name');
-        if (!profile.city) newErrors.push('city');
-        if (!profile.country) newErrors.push('country');
-        setErrors(newErrors);
-        return newErrors.length === 0;
-    };
-
-    const handleSave = async () => {
-        if (!validate()) {
-            return Alert.alert('Incomplete Form', 'Please fill in the required fields highlighted in red.');
-        }
+    const onSubmit = async (data: BasicInfoFormValues) => {
         setSaving(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    name: profile.name,
-                    city: profile.city,
-                    country: profile.country
-                })
-                .eq('id', user.id);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({
+                        name: data.name,
+                        city: data.city,
+                        country: data.country
+                    })
+                    .eq('id', user.id);
 
-            if (error) Alert.alert('Error', error.message);
-            else Alert.alert('Success', 'Profile updated successfully');
+                if (error) throw error;
+                Toast.show({
+                    type: 'success',
+                    text1: 'Profile Updated',
+                    text2: 'Your basic information has been saved successfully.'
+                });
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     if (loading) return (
@@ -86,16 +108,22 @@ export default function BasicInfo() {
 
             <View style={styles.card}>
                 <View style={styles.field}>
-                    <Text style={[styles.label, errors.includes('name') && { color: COLORS.error }]}>Full Name</Text>
-                    <TextInput
-                        style={[styles.input, errors.includes('name') && { borderColor: COLORS.error, borderWidth: 1.5 }]}
-                        value={profile.name}
-                        onChangeText={t => {
-                            setProfile({ ...profile, name: t });
-                            if (errors.includes('name')) setErrors(errors.filter(e => e !== 'name'));
-                        }}
-                        placeholder="John Doe"
-                        placeholderTextColor={COLORS.textDim}
+                    <Text style={[styles.label, errors.name && { color: COLORS.error }]}>
+                        Full Name {errors.name && `(${errors.name.message})`}
+                    </Text>
+                    <Controller
+                        control={control}
+                        name="name"
+                        render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                style={[styles.input, errors.name && { borderColor: COLORS.error, borderWidth: 1.5 }]}
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                                placeholder="John Doe"
+                                placeholderTextColor={COLORS.textDim}
+                            />
+                        )}
                     />
                 </View>
 
@@ -103,7 +131,7 @@ export default function BasicInfo() {
                     <Text style={styles.label}>Email Address (Read Only)</Text>
                     <TextInput
                         style={[styles.input, styles.disabled]}
-                        value={profile.email}
+                        value={email}
                         editable={false}
                         placeholderTextColor={COLORS.textDim}
                     />
@@ -111,34 +139,46 @@ export default function BasicInfo() {
 
                 <View style={styles.row}>
                     <View style={[styles.field, { flex: 1, marginRight: 12 }]}>
-                        <Text style={[styles.label, errors.includes('city') && { color: COLORS.error }]}>City</Text>
-                        <TextInput
-                            style={[styles.input, errors.includes('city') && { borderColor: COLORS.error, borderWidth: 1.5 }]}
-                            value={profile.city}
-                            onChangeText={t => {
-                                setProfile({ ...profile, city: t });
-                                if (errors.includes('city')) setErrors(errors.filter(e => e !== 'city'));
-                            }}
-                            placeholder="Dubai"
-                            placeholderTextColor={COLORS.textDim}
+                        <Text style={[styles.label, errors.city && { color: COLORS.error }]}>
+                            City {errors.city && `*`}
+                        </Text>
+                        <Controller
+                            control={control}
+                            name="city"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                    style={[styles.input, errors.city && { borderColor: COLORS.error, borderWidth: 1.5 }]}
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                    placeholder="Dubai"
+                                    placeholderTextColor={COLORS.textDim}
+                                />
+                            )}
                         />
                     </View>
                     <View style={[styles.field, { flex: 1 }]}>
-                        <Text style={[styles.label, errors.includes('country') && { color: COLORS.error }]}>Country</Text>
-                        <TextInput
-                            style={[styles.input, errors.includes('country') && { borderColor: COLORS.error, borderWidth: 1.5 }]}
-                            value={profile.country}
-                            onChangeText={t => {
-                                setProfile({ ...profile, country: t });
-                                if (errors.includes('country')) setErrors(errors.filter(e => e !== 'country'));
-                            }}
-                            placeholder="UAE"
-                            placeholderTextColor={COLORS.textDim}
+                        <Text style={[styles.label, errors.country && { color: COLORS.error }]}>
+                            Country {errors.country && `*`}
+                        </Text>
+                        <Controller
+                            control={control}
+                            name="country"
+                            render={({ field: { onChange, onBlur, value } }) => (
+                                <TextInput
+                                    style={[styles.input, errors.country && { borderColor: COLORS.error, borderWidth: 1.5 }]}
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                    placeholder="UAE"
+                                    placeholderTextColor={COLORS.textDim}
+                                />
+                            )}
                         />
                     </View>
                 </View>
 
-                <Pressable style={styles.button} onPress={handleSave}>
+                <Pressable style={styles.button} onPress={handleSubmit(onSubmit)} disabled={saving}>
                     {saving ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.buttonText}>Save Changes</Text>}
                 </Pressable>
             </View>

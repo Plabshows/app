@@ -43,7 +43,7 @@ const LISTS = {
     setupTimes: ['None', '15 mins', '30 mins', '1 hour', '2 hours', '3 hours +'],
 };
 
-type Step = 'invite' | 'auth' | 'identity' | 'performance' | 'logistics' | 'media' | 'commercials' | 'success';
+type Step = 'auth' | 'identity' | 'performance' | 'logistics' | 'media' | 'commercials' | 'success';
 
 export default function ArtistOnboarding() {
     const router = useRouter();
@@ -51,10 +51,10 @@ export default function ArtistOnboarding() {
 
     // State
     const [authMode, setAuthMode] = useState<'login' | 'signup'>((mode as 'login' | 'signup') || 'signup');
-    const [currentStep, setCurrentStep] = useState<Step>(mode ? 'auth' : 'invite');
+    const [currentStep, setCurrentStep] = useState<Step>('auth');
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
-    const [inviteCode, setInviteCode] = useState('');
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
@@ -108,7 +108,18 @@ export default function ArtistOnboarding() {
     }, []);
 
     const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
+        // 1. FORCED SESSION CLEANUP (Bypass Corrupt Cache)
+        // Dispara un signOut sutil antes de checar la sesión activa real 
+        // para prevenir loops raros con RefreshTokens vencidos en Ghost Mode.
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+            console.log("Corrupt session detected, clearing storage.");
+            await supabase.auth.signOut();
+            setCurrentStep('auth');
+            return;
+        }
+
         if (session?.user) {
             // If already logged in, check for act
             const { data: existingAct } = await supabase
@@ -118,6 +129,7 @@ export default function ArtistOnboarding() {
                 .maybeSingle();
 
             if (existingAct) {
+                // Happy Path - Enrutando al dashboard exacto.
                 router.replace('/artist-dashboard/edit-profile');
             } else if (currentStep === 'auth') {
                 setCurrentStep('identity');
@@ -137,7 +149,7 @@ export default function ArtistOnboarding() {
     const [modalTargetField, setModalTargetField] = useState<keyof typeof formData | null>(null);
 
     // Constants
-    const INVITE_CODE = '2222';
+
 
     // --- HANDLERS ---
 
@@ -158,10 +170,7 @@ export default function ArtistOnboarding() {
         setModalVisible(false);
     };
 
-    const handleInviteSubmit = () => {
-        if (inviteCode.toUpperCase() === INVITE_CODE) setCurrentStep('auth');
-        else Alert.alert('Invalid Code', 'Access denied.');
-    };
+
 
     const handleAuth = async () => {
         if (!email || !password) return Alert.alert('Error', 'Missing credentials');
@@ -264,11 +273,11 @@ export default function ArtistOnboarding() {
             const blob = await response.blob();
 
             const { data, error } = await supabase.storage
-                .from('act-photos')
+                .from('media')
                 .upload(fileName, blob, { contentType: image.mimeType || `image/${ext}` });
 
             if (!error && data) {
-                const { data: { publicUrl } } = supabase.storage.from('act-photos').getPublicUrl(fileName);
+                const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
                 uploadedUrls.push(publicUrl);
             }
         }
@@ -569,7 +578,7 @@ export default function ArtistOnboarding() {
                     <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.text, letterSpacing: 1 }}>
                         PERFORMANCE LAB
                     </Text>
-                    {currentStep !== 'invite' && currentStep !== 'success' && currentStep !== 'auth' && (
+                    {currentStep !== 'success' && currentStep !== 'auth' && (
                         <Text style={styles.stepIndicator}>
                             Step {['identity', 'performance', 'logistics', 'media', 'commercials'].indexOf(currentStep) + 1}/5
                         </Text>
@@ -577,21 +586,7 @@ export default function ArtistOnboarding() {
                 </View>
 
                 {/* Steps */}
-                {currentStep === 'invite' && (
-                    <View style={styles.centerContainer}>
-                        <Text style={styles.title}>Artist Portal</Text>
-                        <Text style={styles.subtitle}>Enter Invitation Code</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={inviteCode}
-                            onChangeText={setInviteCode}
-                            placeholder="CODE"
-                            placeholderTextColor={COLORS.textDim}
-                            autoCapitalize="characters"
-                        />
-                        <Pressable style={styles.button} onPress={handleInviteSubmit}><Text style={styles.buttonText}>Enter</Text></Pressable>
-                    </View>
-                )}
+
 
                 {currentStep === 'auth' && (
                     <View style={styles.centerContainer}>

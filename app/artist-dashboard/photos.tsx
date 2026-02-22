@@ -1,4 +1,3 @@
-
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,7 +5,6 @@ import { Plus, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Image,
     Pressable,
     ScrollView,
@@ -14,6 +12,7 @@ import {
     Text,
     View
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function PhotoManagement() {
     const [loading, setLoading] = useState(true);
@@ -52,17 +51,17 @@ export default function PhotoManagement() {
 
                 const newUrls: string[] = [];
                 for (const asset of result.assets) {
-                    const ext = asset.uri.split('.').pop();
+                    const ext = asset.uri.split('.').pop() || 'jpg';
                     const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
                     const response = await fetch(asset.uri);
                     const blob = await response.blob();
 
                     const { error } = await supabase.storage
-                        .from('act-photos')
+                        .from('media')
                         .upload(fileName, blob);
 
                     if (!error) {
-                        const { data: { publicUrl } } = supabase.storage.from('act-photos').getPublicUrl(fileName);
+                        const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
                         newUrls.push(publicUrl);
                     }
                 }
@@ -83,10 +82,18 @@ export default function PhotoManagement() {
                 if (upsertError) throw upsertError;
 
                 setPhotos(updatedPhotos);
-                Alert.alert('Success', 'Gallery updated successfully!');
+                Toast.show({
+                    type: 'success',
+                    text1: 'Gallery Updated',
+                    text2: 'Your photos have been uploaded.'
+                });
             } catch (e: any) {
                 console.error('[Photos] Upload Error:', e);
-                Alert.alert('Upload Error', e.message);
+                Toast.show({
+                    type: 'error',
+                    text1: 'Upload Error',
+                    text2: e.message
+                });
             } finally {
                 setUploading(false);
             }
@@ -98,14 +105,27 @@ export default function PhotoManagement() {
         updated.splice(index, 1);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            await supabase.from('acts').update({ photos_url: updated }).eq('owner_id', user.id);
-            setPhotos(updated);
+            const { error } = await supabase.from('acts').update({ photos_url: updated }).eq('owner_id', user.id);
+            if (!error) {
+                setPhotos(updated);
+                Toast.show({
+                    type: 'success',
+                    text1: 'Photo Removed',
+                    text2: 'The photo has been removed from your gallery.'
+                });
+            } else {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Could not remove photo.'
+                });
+            }
         }
     };
 
     if (loading) return (
         <View style={styles.centered}>
-            <ActivityIndicator color={COLORS.primary} />
+            <ActivityIndicator color={COLORS.primary} size="large" />
         </View>
     );
 

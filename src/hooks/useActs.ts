@@ -18,6 +18,12 @@ export interface Act {
     owner_id: string;
     is_published: boolean;
     created_at: string;
+    photos_url?: string[];
+    videos_url?: string[];
+    packages?: { name: string; price: string; duration: string; description: string }[];
+    faqs?: { question: string; answer: string }[];
+    group_members?: { name: string; role: string }[];
+    experience_awards?: { title: string; year: string; description: string }[];
 }
 
 export function useActs() {
