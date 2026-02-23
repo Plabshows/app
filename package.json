@@ -13,6 +13,8 @@
     "@hookform/resolvers": "^3.9.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.8",
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.8.0",
     "@supabase/supabase-js": "^2.96.0",
     "expo": "~54.0.33",
     "expo-av": "~16.0.8",

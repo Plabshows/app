@@ -1,7 +1,16 @@
 export const COLORS = {
   background: '#050505', // Deep Black
-  primary: '#CCFF00',    // Neon Lime (Approximate)
+  primary: '#F97316',    // Primary Orange (shadcn/tailwind style)
+  orange: '#F97316',
+  gray: {
+    50: '#F9FAFB',
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    500: '#6B7280',
+  },
   secondary: '#333333',  // Dark Gray
+  white: '#FFFFFF',
+  black: '#000000',
   text: '#FFFFFF',       // White
   textDim: '#888888',
   surface: '#121212',    // Slightly lighter black for cards

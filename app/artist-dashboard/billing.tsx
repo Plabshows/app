@@ -1,354 +1,165 @@
-import { COLORS, SPACING } from '@/src/constants/theme';
-import { supabase } from '@/src/lib/supabase';
-import { useFocusEffect } from 'expo-router';
-import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Loader2, ShieldCheck } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import { ChevronRight, CreditCard, Download, FileText, Plus } from 'lucide-react-native';
+import React from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Platform,
     Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
+    ScrollView, StyleSheet, Text, View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../../src/constants/theme';
+
+const MOCK_INVOICES = [
+    { id: '1', date: 'Mar 1, 2024', amount: '$199.00', status: 'Paid', plan: 'Annual Pro' },
+    { id: '2', date: 'Feb 1, 2024', amount: '$19.00', status: 'Paid', plan: 'Monthly Pro (Trial)' },
+];
 
 export default function BillingScreen() {
-    const [loading, setLoading] = useState(true);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [stripeStatus, setStripeStatus] = useState({
-        accountId: null as string | null,
-        onboardingComplete: false
-    });
-
-    const fetchStripeStatus = async () => {
-        try {
-            setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('stripe_account_id, stripe_onboarding_complete')
-                .eq('id', user.id)
-                .single();
-
-            if (error) throw error;
-
-            setStripeStatus({
-                accountId: profile?.stripe_account_id,
-                onboardingComplete: profile?.stripe_onboarding_complete || false
-            });
-        } catch (error) {
-            console.error('Error fetching Stripe status:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useFocusEffect(
-        useCallback(() => {
-            fetchStripeStatus();
-        }, [])
-    );
-
-    const handleConnectStripe = async () => {
-        try {
-            setActionLoading(true);
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("No active session");
-
-            const { data, error } = await supabase.functions.invoke('create-connect-account', {
-                body: {}
-            });
-
-            if (error) {
-                console.error("Function error details:", error);
-                throw new Error(error.message || 'Failed to connect to payment server');
-            }
-            if (data?.error) throw new Error(data.error);
-
-            if (data?.url) {
-                if (Platform.OS === 'web') {
-                    window.location.href = data.url;
-                } else {
-                    await Linking.openURL(data.url);
-                }
-            } else {
-                throw new Error("Invalid response from server");
-            }
-
-        } catch (err: any) {
-            console.error(err);
-            Alert.alert('Connection failed', err.message || 'Could not initiate bank connection.');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
-        );
-    }
-
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Payments & Billing</Text>
-                <Text style={styles.subtitle}>Manage your automated payouts and bank connections securely via Stripe.</Text>
-            </View>
+        <SafeAreaView style={styles.container}>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <Text style={styles.title}>Billing</Text>
 
-            {/* STRIPE CONNECTION CARD */}
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <View style={styles.cardIconWrapper}>
-                        <CreditCard size={24} color={COLORS.primary} />
+                {/* Active Plan */}
+                <View style={styles.planCard}>
+                    <View>
+                        <Text style={styles.planLabel}>Current Plan</Text>
+                        <Text style={styles.planTitle}>Annual Pro Membership</Text>
+                        <Text style={styles.planPrice}>$199.00 / year • Renews Mar 2025</Text>
                     </View>
-                    <View style={styles.cardTitleContainer}>
-                        <Text style={styles.cardTitle}>Payout Connection</Text>
-                        <Text style={styles.cardSubtitle}>Receive money directly to your account.</Text>
+                    <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>ACTIVE</Text>
                     </View>
                 </View>
 
-                {stripeStatus.onboardingComplete ? (
-                    <View style={styles.statusBoxSuccess}>
-                        <CheckCircle2 size={20} color="#10B981" />
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statusTitle}>Bank Account Connected</Text>
-                            <Text style={styles.statusText}>
-                                Your payouts are automated. When a client pays for a booking, your 80% split drops directly into your local bank.
-                            </Text>
+                {/* Payment Methods */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Payment Methods</Text>
+                        <Pressable style={styles.addButton}>
+                            <Plus size={18} color={COLORS.orange} />
+                            <Text style={styles.addButtonText}>Add</Text>
+                        </Pressable>
+                    </View>
+
+                    <View style={styles.cardItem}>
+                        <View style={styles.cardInfo}>
+                            <View style={styles.cardIconBox}>
+                                <CreditCard size={20} color="#374151" />
+                            </View>
+                            <View>
+                                <Text style={styles.cardName}>Visa ending in 4242</Text>
+                                <Text style={styles.cardExpiry}>Expires 12/26 • Default</Text>
+                            </View>
                         </View>
+                        <Pressable>
+                            <Text style={styles.editLink}>Edit</Text>
+                        </Pressable>
                     </View>
-                ) : (
-                    <View style={styles.statusBoxPending}>
-                        <AlertCircle size={20} color="#F59E0B" />
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statusTitlePending}>Action Required</Text>
-                            <Text style={styles.statusTextPending}>
-                                You must connect your local bank account to start accepting online payments and finalizing bookings.
-                            </Text>
+                </View>
+
+                {/* Billing History */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Billing History</Text>
+                    {MOCK_INVOICES.map(invoice => (
+                        <View key={invoice.id} style={styles.invoiceItem}>
+                            <View style={styles.invoiceLeft}>
+                                <View style={styles.invoiceIconBox}>
+                                    <FileText size={18} color="#6B7280" />
+                                </View>
+                                <View>
+                                    <Text style={styles.invoiceDate}>{invoice.date}</Text>
+                                    <Text style={styles.invoicePlan}>{invoice.plan}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.invoiceRight}>
+                                <Text style={styles.invoiceAmount}>{invoice.amount}</Text>
+                                <Pressable style={styles.downloadButton}>
+                                    <Download size={16} color={COLORS.orange} />
+                                </Pressable>
+                            </View>
                         </View>
-                    </View>
-                )}
-
-                {!stripeStatus.onboardingComplete && (
-                    <Pressable
-                        style={[styles.primaryButton, actionLoading && styles.buttonDisabled]}
-                        onPress={handleConnectStripe}
-                        disabled={actionLoading}
-                    >
-                        {actionLoading ? (
-                            <Loader2 size={20} color="#000" style={styles.spinner} />
-                        ) : (
-                            <>
-                                <ShieldCheck size={20} color="#000" />
-                                <Text style={styles.primaryButtonText}>
-                                    {stripeStatus.accountId ? 'Resume Bank Connection' : 'Connect Bank via Stripe'}
-                                </Text>
-                            </>
-                        )}
-                    </Pressable>
-                )}
-
-                {stripeStatus.onboardingComplete && (
-                    <Pressable
-                        style={styles.secondaryButton}
-                        onPress={handleConnectStripe}
-                        disabled={actionLoading}
-                    >
-                        {actionLoading ? (
-                            <ActivityIndicator size="small" color={COLORS.primary} />
-                        ) : (
-                            <>
-                                <Text style={styles.secondaryButtonText}>Go to Express Dashboard</Text>
-                                <ExternalLink size={16} color={COLORS.primary} />
-                            </>
-                        )}
-                    </Pressable>
-                )}
-            </View>
-
-            {/* TRANSACTIONS CARD PLACEHOLDER */}
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Recent Payouts</Text>
+                    ))}
                 </View>
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>No payouts processed yet.</Text>
-                    <Text style={styles.emptyStateSub}>Once you complete a booking, funds will appear here.</Text>
-                </View>
-            </View>
-        </ScrollView>
+
+                <Pressable style={styles.customerPortalButton}>
+                    <Text style={styles.customerPortalText}>Go to Stripe Customer Portal</Text>
+                    <ChevronRight size={18} color="#6B7280" />
+                </Pressable>
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
+    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    scrollContent: { padding: SPACING.m },
+    title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 24 },
+
+    planCard: {
+        backgroundColor: '#111827', borderRadius: 20, padding: 24,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+        marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2, shadowRadius: 20, elevation: 8
     },
-    centered: {
-        justifyContent: 'center',
-        alignItems: 'center'
+    planLabel: { color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, fontWeight: '600', marginBottom: 4 },
+    planTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginBottom: 4 },
+    planPrice: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 },
+    statusBadge: {
+        backgroundColor: '#DCFCE7', paddingHorizontal: 10,
+        paddingVertical: 4, borderRadius: 12
     },
-    content: {
-        padding: SPACING.xl,
-        paddingBottom: 100,
-        maxWidth: 800,
-        width: '100%',
-        marginHorizontal: Platform.OS === 'web' ? 'auto' : 0,
+    statusBadgeText: { color: '#166534', fontSize: 10, fontWeight: '800' },
+
+    section: { marginBottom: 32 },
+    sectionHeader: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', marginBottom: 16
     },
-    header: {
-        marginBottom: 32,
+    sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+    addButton: { flexDirection: 'row', alignItems: 'center' },
+    addButtonText: { color: COLORS.orange, fontWeight: '600', marginLeft: 4 },
+
+    cardItem: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', backgroundColor: '#F9FAFB',
+        padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#F3F4F6'
     },
-    title: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: COLORS.text,
-        marginBottom: 8,
+    cardInfo: { flexDirection: 'row', alignItems: 'center' },
+    cardIconBox: {
+        width: 40, height: 40, borderRadius: 8,
+        backgroundColor: '#FFFFFF', justifyContent: 'center',
+        alignItems: 'center', marginRight: 12,
+        borderWidth: 1, borderColor: '#E5E7EB'
     },
-    subtitle: {
-        fontSize: 16,
-        color: COLORS.textDim,
-        lineHeight: 24,
+    cardName: { fontSize: 16, fontWeight: '600', color: '#111827' },
+    cardExpiry: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+    editLink: { color: COLORS.orange, fontWeight: '600' },
+
+    invoiceItem: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', paddingVertical: 16,
+        borderBottomWidth: 1, borderBottomColor: '#F3F4F6'
     },
-    card: {
-        backgroundColor: '#111',
-        borderRadius: 16,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: '#222',
-        marginBottom: 24,
+    invoiceLeft: { flexDirection: 'row', alignItems: 'center' },
+    invoiceIconBox: {
+        width: 36, height: 36, borderRadius: 8,
+        backgroundColor: '#F3F4F6', justifyContent: 'center',
+        alignItems: 'center', marginRight: 12
     },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-        marginBottom: 24,
+    invoiceDate: { fontSize: 15, fontWeight: '600', color: '#374151' },
+    invoicePlan: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+    invoiceRight: { flexDirection: 'row', alignItems: 'center' },
+    invoiceAmount: { fontSize: 15, fontWeight: '700', color: '#111827', marginRight: 16 },
+    downloadButton: {
+        width: 32, height: 32, borderRadius: 8,
+        backgroundColor: '#FFF7ED', justifyContent: 'center', alignItems: 'center'
     },
-    cardIconWrapper: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: 'rgba(212, 255, 0, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
+
+    customerPortalButton: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'center', backgroundColor: '#F9FAFB',
+        padding: 16, borderRadius: 16, marginTop: 10
     },
-    cardTitleContainer: {
-        flex: 1,
-    },
-    cardTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 4,
-    },
-    cardSubtitle: {
-        fontSize: 14,
-        color: COLORS.textDim,
-    },
-    statusBoxSuccess: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(16, 185, 129, 0.3)',
-        gap: 12,
-        marginBottom: 24,
-    },
-    statusTitle: {
-        color: '#10B981',
-        fontWeight: 'bold',
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    statusText: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    statusBoxPending: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
-        gap: 12,
-        marginBottom: 24,
-    },
-    statusTitlePending: {
-        color: '#F59E0B',
-        fontWeight: 'bold',
-        fontSize: 14,
-        marginBottom: 4,
-    },
-    statusTextPending: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    primaryButton: {
-        backgroundColor: COLORS.primary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 12,
-        gap: 8,
-    },
-    buttonDisabled: {
-        opacity: 0.7,
-    },
-    primaryButtonText: {
-        color: '#000',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    secondaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 12,
-        backgroundColor: 'rgba(212, 255, 0, 0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(212, 255, 0, 0.2)',
-        gap: 8,
-    },
-    secondaryButtonText: {
-        color: COLORS.primary,
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-    emptyState: {
-        paddingVertical: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#0A0A0A',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#1A1A1A',
-        borderStyle: 'dashed',
-    },
-    emptyStateText: {
-        color: COLORS.text,
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    emptyStateSub: {
-        color: COLORS.textDim,
-        fontSize: 14,
-    },
-    spinner: {
-        marginRight: 8
-    }
+    customerPortalText: { fontSize: 15, color: '#374151', fontWeight: '500' }
 });

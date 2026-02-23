@@ -43,16 +43,44 @@ serve(async (req) => {
                 }
                 break;
 
-            case 'checkout.session.completed':
-                const session = event.data.object;
+            case 'payment_intent.succeeded':
+                const paymentIntent = event.data.object;
+                const leadId = paymentIntent.metadata?.lead_id;
 
-                // Switch the state of the booking from Pending to IN_ESCROW 
-                // since we successfully charged the client
-                await supabaseClient
-                    .from('bookings')
-                    .update({ fund_status: 'in_escrow' })
-                    .eq('stripe_payment_intent_id', session.payment_intent);
+                if (leadId) {
+                    const { error } = await supabaseClient
+                        .from('leads')
+                        .update({
+                            status: 'paid',
+                            payment_status: 'paid',
+                            stripe_intent_id: paymentIntent.id
+                        })
+                        .eq('id', leadId);
 
+                    if (error) {
+                        console.error(`Failed to update lead ${leadId}:`, error);
+                    } else {
+                        console.log(`Successfully updated lead ${leadId} as paid`);
+                    }
+                } else {
+                    console.log(`Payment successful but no lead_id in metadata for Intent: ${paymentIntent.id}`);
+                }
+                break;
+
+            case 'payment_intent.payment_failed':
+                const failedIntent = event.data.object;
+                const failedLeadId = failedIntent.metadata?.lead_id;
+
+                if (failedLeadId) {
+                    await supabaseClient
+                        .from('leads')
+                        .update({
+                            status: 'payment_failed',
+                            payment_status: 'failed',
+                            stripe_intent_id: failedIntent.id
+                        })
+                        .eq('id', failedLeadId);
+                }
                 break;
 
             default:
