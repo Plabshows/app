@@ -163,21 +163,21 @@ export default function DiscoverScreen() {
         label: 'Dancers',
         copy: 'The heartbeat of every event',
         accent: '#ccff00',
-        image: 'https://images.unsplash.com/photo-1524594152303-9fd13543fe6e?w=800&q=80',
+        image: require('../../assets/images/disciplines/dancers.jpg'),
       },
       {
         key: 'Musician',
         label: 'Singers',
         copy: 'Voices that fill the room',
         accent: '#ff3cac',
-        image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&q=80',
+        image: require('../../assets/images/disciplines/singers.jpg'),
       },
       {
         key: 'Circus',
         label: 'Acrobats',
         copy: 'Jaw-dropping showstoppers',
         accent: '#00d4ff',
-        image: 'https://images.unsplash.com/photo-1594737625785-a6cbdabd333c?w=800&q=80',
+        image: require('../../assets/images/disciplines/acrobats.jpg'),
       },
     ];
     return (
@@ -196,7 +196,7 @@ export default function DiscoverScreen() {
               onPress={() => router.push(`/(tabs)/search?category=${disc.key}`)}
             >
               <ImageBackground
-                source={{ uri: disc.image }}
+                source={disc.image}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
               />
