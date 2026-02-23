@@ -1,6 +1,5 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { useActs } from '@/src/hooks/useActs';
-import { ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -24,6 +23,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +34,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
+
 
 const TOP_CATEGORIES = [
   { id: 'musician', name: 'Musician', icon: Music },
@@ -155,36 +156,70 @@ export default function DiscoverScreen() {
     </View>
   );
 
-  const renderHero = () => (
-    <View style={styles.section}>
-      <Pressable onPress={() => heroAct && router.push(`/act/${heroAct.id}`)}>
-        <View style={styles.heroCard}>
-          {heroAct?.video_url ? (
-            <Video
-              source={{ uri: heroAct.video_url }}
-              style={StyleSheet.absoluteFill}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              shouldPlay
-              isMuted={true}
-            />
-          ) : heroAct?.image_url ? (
-            <Image source={{ uri: heroAct.image_url }} style={StyleSheet.absoluteFill} />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111' }]} />
-          )}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.9)']}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>{heroTitle}</Text>
-            <Text style={styles.heroSubtitle}>Showstoppers your event needs</Text>
-          </View>
-        </View>
-      </Pressable>
-    </View>
-  );
+  const renderHero = () => {
+    const HERO_DISCIPLINES = [
+      {
+        key: 'Dancer',
+        label: 'Dancers',
+        copy: 'The heartbeat of every event',
+        accent: '#ccff00',
+        image: 'https://images.unsplash.com/photo-1524594152303-9fd13543fe6e?w=800&q=80',
+      },
+      {
+        key: 'Musician',
+        label: 'Singers',
+        copy: 'Voices that fill the room',
+        accent: '#ff3cac',
+        image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&q=80',
+      },
+      {
+        key: 'Circus',
+        label: 'Acrobats',
+        copy: 'Jaw-dropping showstoppers',
+        accent: '#00d4ff',
+        image: 'https://images.unsplash.com/photo-1594737625785-a6cbdabd333c?w=800&q=80',
+      },
+    ];
+    return (
+      <View style={styles.section}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SPACING.m, gap: 14 }}
+          decelerationRate="fast"
+          snapToInterval={width - SPACING.m * 2 + 14}
+        >
+          {HERO_DISCIPLINES.map(disc => (
+            <Pressable
+              key={disc.key}
+              style={styles.heroCard}
+              onPress={() => router.push(`/(tabs)/search?category=${disc.key}`)}
+            >
+              <ImageBackground
+                source={{ uri: disc.image }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.88)']}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.heroContent}>
+                <View style={[styles.heroCategoryBadge, { backgroundColor: disc.accent + '22', borderColor: disc.accent + '66' }]}>
+                  <Text style={[styles.heroCategoryLabel, { color: disc.accent }]}>{disc.label.toUpperCase()}</Text>
+                </View>
+                <Text style={styles.heroTitle}>{disc.label}</Text>
+                <Text style={styles.heroSubtitle}>{disc.copy}</Text>
+                <View style={[styles.heroCTA, { backgroundColor: disc.accent }]}>
+                  <Text style={styles.heroCTAText}>Browse {disc.label} →</Text>
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderFeatured = () => (
     <View style={styles.section}>
@@ -256,7 +291,6 @@ export default function DiscoverScreen() {
       </ScrollView>
     </View>
   );
-
 
 
   const renderRoaming = () => {
@@ -399,8 +433,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   heroCard: {
+    width: width - SPACING.m * 2,
     height: 220,
-    marginHorizontal: SPACING.m,
     borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
@@ -421,6 +455,31 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     color: COLORS.textDim,
     fontSize: 14,
+  },
+  heroCategoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 6,
+  },
+  heroCategoryLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  heroCTA: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  heroCTAText: {
+    color: '#000',
+    fontWeight: '800',
+    fontSize: 12,
   },
   sectionHeader: {
     flexDirection: 'row',

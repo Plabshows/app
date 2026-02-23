@@ -125,7 +125,6 @@ export default function UnifiedEditProfile() {
             return Alert.alert('Incomplete Form', 'Please fill in the required fields highlighted in red.');
         }
 
-        // TAREA 2.1: Estado de Carga
         setSaving(true);
         console.log('[handleSave] Starting save process...');
 
@@ -134,7 +133,7 @@ export default function UnifiedEditProfile() {
 
             let finalPhotoUrl = existingPhotoUrl;
 
-            // TAREA 2.2: Subida de Imagen (Si cambió)
+            // ── Image Upload ──────────────────────────────────────────────
             if (selectedImage) {
                 console.log('[handleSave] New image detected, starting upload...');
                 setIsUploading(true);
@@ -150,7 +149,7 @@ export default function UnifiedEditProfile() {
                         .from('media')
                         .upload(filePath, blob, {
                             contentType: `image/${fileExt}`,
-                            upsert: true // Crucial per user request
+                            upsert: true
                         });
 
                     if (uploadError) throw uploadError;
@@ -169,23 +168,52 @@ export default function UnifiedEditProfile() {
                 }
             }
 
-            // TAREA 2.3: Actualización de Datos (SQL Update)
-            console.log('[handleSave] Updating database records...');
+            // ── Determine if this is the first image (auto-assign rule) ──
+            // Fetch the current act to check existing photos
+            const { data: currentAct } = await supabase
+                .from('acts')
+                .select('image_url, photos_url')
+                .eq('owner_id', user.id)
+                .maybeSingle();
 
-            // 1. Profiles Table
+            const existingPhotos: string[] = Array.isArray(currentAct?.photos_url)
+                ? currentAct.photos_url
+                : [];
+
+            // Build the new photos array (append new photo, avoid duplicates)
+            let updatedPhotos = [...existingPhotos];
+            if (finalPhotoUrl && !updatedPhotos.includes(finalPhotoUrl)) {
+                updatedPhotos.push(finalPhotoUrl);
+            }
+
+            // 🎯 AUTO-ASSIGN RULE: First image = cover + avatar
+            // If no image_url exists yet, the uploaded photo becomes the main image
+            const isFirstImage = !currentAct?.image_url && finalPhotoUrl;
+            const coverImageUrl = isFirstImage
+                ? finalPhotoUrl
+                : (currentAct?.image_url || finalPhotoUrl);
+
+            console.log('[handleSave] Auto-assign check:', {
+                isFirstImage,
+                coverImageUrl,
+                totalPhotos: updatedPhotos.length,
+            });
+
+            // ── 1. Profiles Table ─────────────────────────────────────────
             const { error: profError } = await supabase
                 .from('profiles')
                 .update({
                     name: profileData.full_name,
                     city: profileData.city,
                     country: profileData.country,
-                    avatar_url: finalPhotoUrl
+                    // 🎯 Avatar = cover image (first photo or existing)
+                    avatar_url: coverImageUrl
                 })
                 .eq('id', user.id);
 
             if (profError) throw profError;
 
-            // 2. Acts Table
+            // ── 2. Acts Table ─────────────────────────────────────────────
             const { error: actError } = await supabase
                 .from('acts')
                 .upsert({
@@ -196,8 +224,12 @@ export default function UnifiedEditProfile() {
                     genre: profileData.genre,
                     description: profileData.bio,
                     price_guide: profileData.price_guide,
-                    photos_url: finalPhotoUrl ? [finalPhotoUrl] : []
+                    // 🎯 image_url = main cover image (used in cards/listings)
+                    image_url: coverImageUrl,
+                    // photos_url = full gallery array
+                    photos_url: updatedPhotos.length > 0 ? updatedPhotos : []
                 }, { onConflict: 'owner_id' });
+
 
             if (actError) throw actError;
 
