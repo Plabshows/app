@@ -134,7 +134,48 @@ export default function BookingWizard() {
 
             if (insertError) throw insertError;
 
-            // 4. Navigate to confirmation with request ID for optional linking
+            // 4. Send email notification (fire-and-forget — don't block UX)
+            try {
+                const actName = request.act_id; // fallback
+                // Try to get the artist name for the email subject
+                const { data: actInfo } = await supabase
+                    .from('acts')
+                    .select('name')
+                    .eq('id', actId)
+                    .single();
+
+                const artistName = actInfo?.name || actName;
+
+                await supabase.functions.invoke('notify-booking-request', {
+                    body: {
+                        request_id: request.id,
+                        artist_name: artistName,
+                        artist_id: actData.owner_id,
+                        act_id: actId,
+                        package_id: packageData ? JSON.parse(packageData as string) : null,
+                        event_dates: data.event_dates,
+                        start_time: data.start_time,
+                        apply_to_all_dates: data.apply_to_all_dates,
+                        duration_minutes: parseInt(data.duration_minutes),
+                        event_type: data.event_type,
+                        guests_count: parseInt(data.guests_count),
+                        location_text: data.location_text,
+                        address_details: data.address_details || null,
+                        expand_search: data.expand_search,
+                        budget_amount: data.budget_amount ? parseFloat(data.budget_amount) : null,
+                        notes: data.notes,
+                        client_email: data.client_email,
+                        client_phone: data.client_phone || null,
+                        managed_by_admin: managedByAdmin === 'true',
+                    }
+                });
+                console.log('[BookingWizard] Email notification sent');
+            } catch (emailError) {
+                // Don't block the UX if email fails — request is already saved
+                console.error('[BookingWizard] Email notification failed (non-blocking):', emailError);
+            }
+
+            // 5. Navigate to confirmation with request ID for optional linking
             router.push({
                 pathname: '/booking/confirmation',
                 params: { requestId: request.id, email: data.client_email }
