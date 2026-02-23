@@ -50,48 +50,55 @@ export function useAct(id: string | string[]) {
 
     useEffect(() => {
         if (id) {
-            fetchAct();
+            const actId = Array.isArray(id) ? id[0] : id;
+            fetchAct(actId);
         }
     }, [id]);
 
-    async function fetchAct() {
+    async function fetchAct(actId: string) {
         try {
             setLoading(true);
+            setError(null);
 
             // Fetch act with joined profile for avatar and name
-            // @ts-ignore - Supabase type inference can be tricky with joins
+            // Correct syntax for multi-relation joins is alias:table!fk_column
             const { data, error: fetchError } = await supabase
                 .from('acts')
                 .select(`
                     *,
-                    profile:owner_id(name, avatar_url),
+                    profile:profiles!owner_id(name, avatar_url),
                     reviews(
                         id,
                         rating,
                         comment,
                         created_at,
-                        profile:reviewer_id(name, avatar_url)
+                        profile:profiles!reviewer_id(name, avatar_url)
                     )
                 `)
-                .eq('id', id)
+                .eq('id', actId)
                 .single();
 
-            if (fetchError) throw fetchError;
+            if (fetchError) {
+                console.error('Supabase fetch error:', fetchError);
+                throw fetchError;
+            }
 
             if (data) {
                 // Map the joined data for easier consumption
                 const mappedData: ActDetailData = {
                     ...data,
                     category: data.category || 'Artist',
-                    artistName: (data.profile as any)?.name || data.name || data.title,
+                    artistName: (data.profile as any)?.name || data.name || data.title || 'Artist',
                     avatar_url: (data.profile as any)?.avatar_url,
-                    location: data.location_base || (data.profile as any)?.city ? `${(data.profile as any).city}, ${(data.profile as any).country}` : 'Dubai, UAE',
+                    location: data.location_base || 'Dubai, UAE',
                     reviews: data.reviews || []
                 };
                 setAct(mappedData);
+            } else {
+                setError(new Error('No data returned for act ID: ' + actId));
             }
-        } catch (e) {
-            console.error('Error fetching act:', e);
+        } catch (e: any) {
+            console.error('Error fetching act in hook:', e);
             setError(e);
         } finally {
             setLoading(false);
