@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import {
     Camera,
     CreditCard,
@@ -9,9 +10,11 @@ import {
     User,
     X
 } from 'lucide-react-native';
-import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { COLORS, SPACING } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 interface StepProps {
     data: any;
@@ -19,6 +22,8 @@ interface StepProps {
     onNext: () => void;
     onBack?: () => void;
 }
+
+// ... StepProps interface ...
 
 export const PersonalStep = ({ data, updateData, onNext }: StepProps) => (
     <ScrollView contentContainerStyle={styles.stepContainer}>
@@ -112,7 +117,6 @@ export const ArtistInfoStep = ({ data, updateData, onNext }: StepProps) => (
     </ScrollView>
 );
 
-// Add more placeholder steps for now to test the wizard framework
 export const PlaceholderStep = ({ title, nextTitle, onNext }: any) => (
     <View style={styles.stepContainer}>
         <Text style={styles.stepTitle}>{title}</Text>
@@ -124,13 +128,74 @@ export const PlaceholderStep = ({ title, nextTitle, onNext }: any) => (
 );
 
 export const PhotoStep = ({ data, updateData, onNext }: StepProps) => {
+    const { user } = useAuth();
     const photos = data.photos_url || [];
+    const [uploading, setUploading] = useState(false);
+    const [previews, setPreviews] = useState<string[]>([]);
 
-    const handleAddPhoto = () => {
-        // In a real app, this would open ImagePicker. 
-        // For the wizard, we'll prompt for a URL for demo purposes or use a placeholder.
-        const mockUrl = `https://picsum.photos/400/400?random=${Date.now()}`;
-        updateData({ photos_url: [...photos, mockUrl] });
+    const handleAddPhoto = async () => {
+        if (!user) return Alert.alert('Error', 'No user session found');
+
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: false,
+                quality: 0.8,
+            });
+
+            if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+            const asset = result.assets[0];
+
+            // Generate local preview immediately for web
+            if (Platform.OS === 'web' && asset.uri) {
+                // If it's already a blob/data URI we can use it, 
+                // but ImagePicker on web sometimes gives a local URI or blob
+                setPreviews(prev => [...prev, asset.uri]);
+            }
+
+            setUploading(true);
+
+            // Create unique filename
+            const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(7);
+            const fileName = `${user.id}/${randomId}-${timestamp}.${ext}`;
+
+            // Fetch file blob (necessary for Supabase upload on many platforms)
+            const response = await fetch(asset.uri);
+            const blob = await response.blob();
+
+            // Upload to Supabase
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('media')
+                .upload(fileName, blob, {
+                    contentType: asset.mimeType || `image/${ext}`,
+                    upsert: false
+                });
+
+            if (uploadError) throw uploadError;
+
+            // Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('media')
+                .getPublicUrl(fileName);
+
+            // Add cache buster
+            const finalUrl = `${publicUrl}?t=${Date.now()}`;
+
+            // Update main form data
+            updateData({ photos_url: [...photos, finalUrl] });
+
+            // Clear local preview if desired (optional, as main state update will trigger re-render)
+            setPreviews(prev => prev.filter(p => p !== asset.uri));
+
+        } catch (error: any) {
+            console.error('Upload error:', error);
+            Alert.alert('Upload Failed', error.message || 'Could not upload image');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const removePhoto = (index: number) => {
@@ -155,13 +220,33 @@ export const PhotoStep = ({ data, updateData, onNext }: StepProps) => {
                     </View>
                 ))}
 
-                <Pressable style={styles.mediaSlot} onPress={handleAddPhoto}>
-                    <Camera size={32} color={COLORS.primary} />
-                    <Text style={styles.mediaSlotText}>Add Photo</Text>
+                {/* Show local previews that are currently uploading */}
+                {previews.map((url: string, i: number) => (
+                    <View key={`preview-${i}`} style={[styles.photoWrapper, { opacity: 0.6 }]}>
+                        <Image source={{ uri: url }} style={styles.mediaImage} />
+                        <View style={styles.loadingOverlay}>
+                            <ActivityIndicator color={COLORS.primary} size="small" />
+                        </View>
+                    </View>
+                ))}
+
+                <Pressable
+                    style={[styles.mediaSlot, uploading && { opacity: 0.5 }]}
+                    onPress={handleAddPhoto}
+                    disabled={uploading}
+                >
+                    {uploading ? (
+                        <ActivityIndicator color={COLORS.primary} size="large" />
+                    ) : (
+                        <>
+                            <Camera size={32} color={COLORS.primary} />
+                            <Text style={styles.mediaSlotText}>Add Photo</Text>
+                        </>
+                    )}
                 </Pressable>
             </View>
 
-            <Pressable style={styles.nextButton} onPress={onNext}>
+            <Pressable style={styles.nextButton} onPress={onNext} disabled={uploading}>
                 <Text style={styles.nextButtonText}>Next: Videos</Text>
             </Pressable>
         </ScrollView>
@@ -860,6 +945,12 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     infoBoxText: { color: COLORS.textDim, fontSize: 13, flex: 1 },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     nextButton: {
         backgroundColor: COLORS.primary,
         padding: 20,

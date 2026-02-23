@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -39,6 +40,7 @@ const STEPS_LABELS = [
 
 export default function ArtistProfileWizard() {
     const { user, refreshAuth } = useAuth();
+    const router = useRouter();
     const insets = useSafeAreaInsets();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(true);
@@ -141,12 +143,6 @@ export default function ArtistProfileWizard() {
         }
     };
 
-    const handleBack = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
-
     const handleFinalSave = async () => {
         if (!user) return;
         setSaving(true);
@@ -242,8 +238,8 @@ export default function ArtistProfileWizard() {
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {/* --- WIZARD HEADER --- */}
             <View style={styles.header}>
-                <Pressable onPress={handleBack} style={styles.backButton}>
-                    <ChevronLeft size={24} color={currentStep === 1 ? '#333' : COLORS.text} />
+                <Pressable onPress={() => router.push('/profile')} style={styles.backButton}>
+                    <ChevronLeft size={24} color={COLORS.text} />
                 </Pressable>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.headerTitle}>Step {currentStep} of {TOTAL_STEPS}</Text>
