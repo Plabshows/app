@@ -43,29 +43,56 @@ serve(async (req) => {
                 }
                 break;
 
-            case 'payment_intent.succeeded':
-                const paymentIntent = event.data.object;
-                const leadId = paymentIntent.metadata?.lead_id;
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                const metadata = session.payment_intent_data?.metadata || session.metadata;
 
-                if (leadId) {
-                    const { error } = await supabaseClient
-                        .from('leads')
-                        .update({
-                            status: 'paid',
-                            payment_status: 'paid',
-                            stripe_intent_id: paymentIntent.id
-                        })
-                        .eq('id', leadId);
+                if (metadata?.type === 'booking_availability_authorization') {
+                    const bookingRequestId = metadata.booking_request_id;
+                    const quoteId = metadata.quote_id;
 
-                    if (error) {
-                        console.error(`Failed to update lead ${leadId}:`, error);
-                    } else {
-                        console.log(`Successfully updated lead ${leadId} as paid`);
-                    }
-                } else {
-                    console.log(`Payment successful but no lead_id in metadata for Intent: ${paymentIntent.id}`);
+                    // 1. Update Booking Request Status
+                    await supabaseClient
+                        .from('booking_requests')
+                        .update({ status: 'accepted' }) // Authorized/Accepted
+                        .eq('id', bookingRequestId);
+
+                    // 2. Insert Payment Record (Holding)
+                    await supabaseClient
+                        .from('payments')
+                        .insert({
+                            booking_request_id: bookingRequestId,
+                            quote_id: quoteId,
+                            provider: 'stripe',
+                            stripe_payment_intent_id: session.payment_intent,
+                            amount: session.amount_total / 100,
+                            currency: session.currency.toUpperCase(),
+                            status: 'requires_capture'
+                        });
+
+                    console.log(`Booking request ${bookingRequestId} authorized via Stripe.`);
                 }
                 break;
+            }
+
+            case 'payment_intent.succeeded': {
+                const paymentIntent = event.data.object;
+                const leadId = paymentIntent.metadata?.lead_id;
+                const bookingId = paymentIntent.metadata?.bookingId;
+
+                if (leadId) {
+                    await supabaseClient
+                        .from('leads')
+                        .update({ status: 'paid', payment_status: 'paid', stripe_intent_id: paymentIntent.id })
+                        .eq('id', leadId);
+                } else if (bookingId) {
+                    await supabaseClient
+                        .from('bookings')
+                        .update({ fund_status: 'paid' })
+                        .eq('id', bookingId);
+                }
+                break;
+            }
 
             case 'payment_intent.payment_failed':
                 const failedIntent = event.data.object;

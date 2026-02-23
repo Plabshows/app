@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Lock, Mail } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -8,15 +8,16 @@ import { useAuth } from '../src/context/AuthContext';
 import { supabase } from '../src/lib/supabase';
 
 export default function LoginScreen() {
+    const { redirectTo, linkRequestId, emailHint } = useLocalSearchParams();
     const router = useRouter();
     const { refreshAuth } = useAuth();
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState((emailHint as string) || '');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [errorMsg, setErrorMsg] = useState(''); // Estado para mensaje de error nativo en UI
+    const [errorMsg, setErrorMsg] = useState('');
 
     const handleLogin = async () => {
-        setErrorMsg(''); // Reset error
+        setErrorMsg('');
         if (!email || !password) {
             setErrorMsg('Please fill in all fields');
             return;
@@ -24,27 +25,35 @@ export default function LoginScreen() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data: { user }, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
-            if (error) {
-                console.error('[Login] Error real de Supabase auth:', error.message);
-                throw error;
+            if (error) throw error;
+
+            if (user && linkRequestId) {
+                // Link the guest booking request to this user
+                await supabase
+                    .from('booking_requests')
+                    .update({ client_id: user.id })
+                    .eq('id', linkRequestId);
             }
 
             // Fetch profile to check role/admin status
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('is_admin, role')
-                .eq('id', (await supabase.auth.getUser()).data.user?.id)
+                .eq('id', user?.id)
                 .single();
 
-            if (profile?.is_admin) {
-                router.push('/admin' as any);
+            if (redirectTo) {
+                // @ts-ignore
+                router.replace(redirectTo as any);
+            } else if (profile?.is_admin) {
+                router.replace('/admin' as any);
             } else {
-                router.push('/artist-dashboard' as any);
+                router.replace('/artist-dashboard' as any);
             }
         } catch (error: any) {
             setErrorMsg(error.message);

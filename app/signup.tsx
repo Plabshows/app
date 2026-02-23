@@ -1,124 +1,98 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Lock, Mail, User, UserPlus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignupScreen() {
+    const { redirectTo, linkRequestId, emailHint } = useLocalSearchParams();
     const router = useRouter();
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState((emailHint as string) || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [artistName, setArtistName] = useState('');
     const [loading, setLoading] = useState(false);
-    const [errorMsg, setErrorMsg] = useState(''); // Estado visual de error
+    const [errorMsg, setErrorMsg] = useState('');
 
     const handleSignup = async () => {
-        setErrorMsg(''); // Reset error
-        // Validation with immediate feedback
-        if (!email || !password || !confirmPassword || !artistName) {
-            console.log('[Signup] Validation failed: Missing fields');
-            setErrorMsg('Por favor rellena todos los campos para continuar.');
+        setErrorMsg('');
+        if (!email || !password || !confirmPassword || (!linkRequestId && !artistName)) {
+            setErrorMsg('Please fill in all fields.');
             return;
         }
 
         if (password !== confirmPassword) {
-            console.log('[Signup] Validation failed: Password mismatch');
-            setErrorMsg('Las contraseñas no coinciden.');
+            setErrorMsg('Passwords do not match.');
             return;
         }
 
         setLoading(true);
-        console.log('[Signup] Iniciando proceso de registro...', { email, artistName });
-
         try {
-            // STEP 1: Supabase Auth Signup
-            console.log('[Signup] Paso 1: Creando usuario en Supabase Auth...');
             const { data: { user, session }, error: signUpError } = await supabase.auth.signUp({
                 email,
                 password,
             });
 
-            if (signUpError) {
-                console.error('[Signup] Error en Auth.signUp:', signUpError.message);
-                throw signUpError;
-            }
+            if (signUpError) throw signUpError;
+            if (!user) throw new Error('No user data returned.');
 
-            if (!user) {
-                const noUserError = new Error('No se recibió la información del usuario tras el registro.');
-                console.error('[Signup] Error Crítico:', noUserError.message);
-                throw noUserError;
-            }
-
-            console.log('[Signup] Usuario creado con ID:', user.id, 'Sesión activa:', !!session);
-
-            // STEP 2: Profile & Act Initialization (Frontend logic)
-            // We only proceed if we have a session (or if we trust the user won't be blocked by RLS)
-            // Note: If session is null, it usually means email confirmation is required.
             if (session) {
-                console.log('[Signup] Paso 2: Inicializando Perfil y Acto...');
+                const isClient = !!linkRequestId;
+                const role = isClient ? 'client' : 'artist';
+                const name = isClient ? email.split('@')[0] : artistName;
 
-                // 2a. Update Profile
+                // Create Profile
                 const { error: profileError } = await supabase
                     .from('profiles')
                     .upsert({
                         id: user.id,
-                        name: artistName,
-                        role: 'artist',
+                        name: name,
+                        role: role,
                         email: email
                     }, { onConflict: 'id' });
 
-                if (profileError) {
-                    console.error('[Signup] Error inicializando perfil:', profileError.message);
-                    // We log but don't critical-fail here, as the user exists and can edit later
-                } else {
-                    console.log('[Signup] Perfil creado/actualizado correctamente.');
+                if (linkRequestId) {
+                    // Link the guest booking request
+                    await supabase
+                        .from('booking_requests')
+                        .update({ client_id: user.id })
+                        .eq('id', linkRequestId);
                 }
 
-                // 2b. Initialize Act
-                const { error: actError } = await supabase
-                    .from('acts')
-                    .insert({
-                        owner_id: user.id,
-                        name: artistName,
-                        category: 'Specialty Act',
-                        artist_type: 'Solo',
-                        description: `Perfil artístico de ${artistName}`,
-                        is_published: false
-                    });
-
-                if (actError) {
-                    console.error('[Signup] Error inicializando acto:', actError.message);
-                } else {
-                    console.log('[Signup] Acto inicializado correctamente.');
+                if (!isClient) {
+                    // Initialize Act only for artists
+                    await supabase
+                        .from('acts')
+                        .insert({
+                            owner_id: user.id,
+                            name: artistName,
+                            category: 'Specialty Act',
+                            artist_type: 'Solo',
+                            description: `Artist profile for ${artistName}`,
+                            is_published: false
+                        });
                 }
 
-                // STEP 3: Forced Redirection
-                console.log('[Signup] Paso 3: Redirigiendo al Dashboard...');
-                router.push('/artist-dashboard' as any);
+                if (redirectTo) {
+                    // @ts-ignore
+                    router.replace(redirectTo as any);
+                } else {
+                    router.replace(isClient ? '/(tabs)/bookings' : '/artist-dashboard');
+                }
             } else {
-                // Handle "Confirm Email" requirement
-                console.log('[Signup] Registro exitoso pero requiere verificación de email.');
-                const confirmMsg = 'Cuenta creada correctamente. Por favor, revisa tu email y confirma tu cuenta antes de iniciar sesión.';
-                setErrorMsg(confirmMsg); // Show in the UI potentially, but also an alert for the web user isn't bad
-
-                if (Platform.OS === 'web') {
-                    window.alert(confirmMsg);
-                } else {
-                    Alert.alert('Verificación Requerida', confirmMsg);
-                }
-
+                const confirmMsg = 'Account created! Please check your email to confirm before logging in.';
+                setErrorMsg(confirmMsg);
+                if (Platform.OS === 'web') window.alert(confirmMsg);
+                else Alert.alert('Verification Required', confirmMsg);
                 router.push('/login');
             }
 
         } catch (error: any) {
-            console.error('[Signup] ERROR CRÍTICO EN FLUJO:', error.message);
-            setErrorMsg(error.message || 'Error desconocido durante el registro.');
+            setErrorMsg(error.message);
         } finally {
             setLoading(false);
-            console.log('[Signup] Proceso finalizado.');
         }
     };
 

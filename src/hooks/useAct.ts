@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 export interface ActProfile {
     name: string;
     avatar_url: string;
+    managed_by_admin?: boolean;
 }
 
 export interface Review {
@@ -60,13 +61,13 @@ export function useAct(id: string | string[]) {
             setLoading(true);
             setError(null);
 
-            // Fetch act with joined profile for avatar and name
-            // Correct syntax for multi-relation joins is alias:table!fk_column
+            // Fetch act with joined profile and category
             const { data, error: fetchError } = await supabase
                 .from('acts')
                 .select(`
                     *,
-                    profile:profiles!owner_id(name, avatar_url),
+                    profile:profiles!owner_id(name, avatar_url, managed_by_admin),
+                    category_data:categories(name),
                     reviews(
                         id,
                         rating,
@@ -87,11 +88,12 @@ export function useAct(id: string | string[]) {
                 // Map the joined data for easier consumption
                 const mappedData: ActDetailData = {
                     ...data,
-                    category: data.category || 'Artist',
-                    artistName: (data.profile as any)?.name || data.name || data.title || 'Artist',
+                    category: (data.category_data as any)?.name || data.category || 'Artist',
+                    artistName: (data.profile as any)?.name || data.name || 'Artist',
                     avatar_url: (data.profile as any)?.avatar_url,
                     location: data.location_base || 'Dubai, UAE',
-                    reviews: data.reviews || []
+                    reviews: data.reviews || [],
+                    packages: data.packages || []
                 };
                 setAct(mappedData);
             } else {

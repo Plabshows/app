@@ -1,9 +1,8 @@
 import { COLORS } from '@/src/constants/theme';
 import { ActDetailData, useAct } from '@/src/hooks/useAct';
 import { ResizeMode, Video } from 'expo-av';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Share2, Star, Video as VideoIcon } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Star, Video as VideoIcon } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -61,20 +60,23 @@ export default function ActDetail() {
     const photos = useMemo(() => displayAct.photos_url || [], [displayAct]);
     const mainYtId = useMemo(() => getYouTubeID(displayAct.video_url || ''), [displayAct]);
 
+    // Rating logic
+    const reviews = displayAct.reviews || [];
+    const reviewCount = reviews.length;
+    const avgRating = reviewCount > 0
+        ? (reviews.reduce((acc, rev) => acc + (rev.rating || 0), 0) / reviewCount).toFixed(1)
+        : 'New';
+
     // Business Logic: 20% Markup
     const MARGIN_MULTIPLIER = 1.20;
 
-    const handleBookPackage = (pkg: any) => {
-        const basePrice = parseInt(pkg.price || '0', 10);
-        const finalPrice = Math.round(basePrice * MARGIN_MULTIPLIER);
-
+    const handleBookPackage = (pkg: any | null) => {
+        // @ts-ignore - Dynamic route might not be captured by types yet
         router.push({
-            pathname: '/modal',
+            pathname: `/booking/${id}`,
             params: {
-                actId: displayAct.id,
-                actTitle: displayAct.artistName || displayAct.name,
-                packageSelected: pkg.name,
-                finalPrice: finalPrice
+                packageData: pkg ? JSON.stringify(pkg) : null,
+                managedByAdmin: displayAct.profile?.managed_by_admin ? 'true' : 'false'
             }
         });
     };
@@ -95,14 +97,10 @@ export default function ActDetail() {
         );
     }
 
-    // Never show a hard error screen. If it failed, show the fallback act.
-    // We only show a small hint if it was an error during development.
-    // But for production, it just shows a placeholder profile.
-
     const renderHeader = () => (
-        <View style={styles.hero}>
-            {/* Cover Image */}
-            <View style={styles.coverContainer}>
+        <View style={styles.header}>
+            {/* ... cover image block ... */}
+            <View style={styles.coverImageContainer}>
                 {displayAct.video_url && !mainYtId ? (
                     <Video
                         source={{ uri: displayAct.video_url }}
@@ -114,28 +112,23 @@ export default function ActDetail() {
                     />
                 ) : (
                     <Image
-                        source={{ uri: mainYtId ? `https://img.youtube.com/vi/${mainYtId}/maxresdefault.jpg` : (displayAct.image_url || (photos.length > 0 ? photos[0] : 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819')) }}
+                        source={{ uri: photos[0] || 'https://euphonious-kelpie-cd0a27.netlify.app/images/hero-bg.jpg' }}
                         style={styles.coverImage}
                     />
                 )}
-                <LinearGradient
-                    colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
-                    style={styles.heroGradient}
-                />
-            </View>
+                <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
 
-            {/* Top Navigation Bar */}
-            <View style={styles.topBar}>
-                <Pressable onPress={handleGoBack} style={styles.roundIconBtn}>
-                    <ArrowLeft color="#fff" size={22} />
-                </Pressable>
-                <Pressable style={styles.roundIconBtn}>
-                    <Share2 color="#fff" size={22} />
+                {/* Back Button */}
+                <Pressable
+                    style={styles.backButtonAbsolute}
+                    onPress={handleGoBack}
+                >
+                    <ArrowLeft color="#fff" size={24} />
                 </Pressable>
             </View>
 
             {/* Profile Info Overlay */}
-            <View style={styles.profileHeader}>
+            <View style={styles.headerContent}>
                 <View style={styles.avatarContainer}>
                     <Image
                         source={{ uri: displayAct.avatar_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
@@ -150,12 +143,7 @@ export default function ActDetail() {
 
                 <View style={styles.headerInfo}>
                     <View style={styles.nameRow}>
-                        <Text style={styles.artistName}>{displayAct.artistName}</Text>
-                        {displayAct.is_pro && (
-                            <View style={styles.proBadge}>
-                                <Text style={styles.proBadgeText}>PRO</Text>
-                            </View>
-                        )}
+                        <Text style={styles.artistNameHeader}>{displayAct.artistName}</Text>
                     </View>
                     <View style={styles.taglineRow}>
                         <Text style={styles.categoryTag}>{displayAct.category}</Text>
@@ -165,9 +153,14 @@ export default function ActDetail() {
                     </View>
                 </View>
 
-                <Pressable style={styles.checkAvailabilityBtn}>
-                    <Text style={styles.checkAvailabilityBtnText}>Check Availability</Text>
-                </Pressable>
+                <View style={styles.ctaRow}>
+                    <Pressable style={styles.checkAvailabilityBtn} onPress={() => handleBookPackage(null)}>
+                        <Text style={styles.checkAvailabilityBtnText}>Check Availability</Text>
+                    </Pressable>
+                    <Pressable style={styles.bookNowSecondaryBtn} onPress={() => handleBookPackage(displayAct.packages?.[0] || null)}>
+                        <Text style={styles.bookNowSecondaryBtnText}>Book Now</Text>
+                    </Pressable>
+                </View>
             </View>
         </View>
     );
@@ -196,7 +189,7 @@ export default function ActDetail() {
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>About {displayAct.artistName}</Text>
                 <Text style={styles.bioText}>
-                    {displayAct.description || "No biography available."}
+                    {displayAct.description || "This artist hasn't provided a biography yet."}
                 </Text>
             </View>
 
@@ -207,7 +200,7 @@ export default function ActDetail() {
                     <DetailItem label="Art Type" value={displayAct.category} />
                     <DetailItem label="Specialty" value={displayAct.genre || displayAct.artist_type || 'Performer'} />
                     <DetailItem label="Experience" value={`${displayAct.experience_years || 5}+ Years`} />
-                    <DetailItem label="Base" value={displayAct.location_base || 'Dubai, UAE'} />
+                    <DetailItem label="Base" value={displayAct.location_base || displayAct.location || 'Dubai, UAE'} />
                 </View>
             </View>
         </View>
@@ -217,21 +210,27 @@ export default function ActDetail() {
         <View style={styles.tabContent}>
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Gallery</Text>
-                <View style={styles.mediaGrid}>
-                    {videos.map((vid, i) => (
-                        <Pressable key={`vid-${i}`} style={styles.mediaItem} onPress={() => Linking.openURL(vid)}>
-                            <Image source={{ uri: `https://img.youtube.com/vi/${getYouTubeID(vid)}/0.jpg` }} style={styles.mediaImage} />
-                            <View style={styles.playOverlay}>
-                                <VideoIcon color="#fff" size={24} />
+                {photos.length === 0 && videos.length === 0 ? (
+                    <View style={styles.emptyBox}>
+                        <Text style={styles.emptyText}>No photos or videos uploaded yet.</Text>
+                    </View>
+                ) : (
+                    <View style={styles.mediaGrid}>
+                        {videos.map((vid, i) => (
+                            <Pressable key={`vid-${i}`} style={styles.mediaItem} onPress={() => Linking.openURL(vid)}>
+                                <Image source={{ uri: `https://img.youtube.com/vi/${getYouTubeID(vid)}/maxresdefault.jpg` }} style={styles.mediaImage} />
+                                <View style={styles.playOverlay}>
+                                    <VideoIcon color="#fff" size={24} />
+                                </View>
+                            </Pressable>
+                        ))}
+                        {photos.map((photo, i) => (
+                            <View key={`photo-${i}`} style={styles.mediaItem}>
+                                <Image source={{ uri: photo }} style={styles.mediaImage} />
                             </View>
-                        </Pressable>
-                    ))}
-                    {photos.map((photo, i) => (
-                        <View key={`photo-${i}`} style={styles.mediaItem}>
-                            <Image source={{ uri: photo }} style={styles.mediaImage} />
-                        </View>
-                    ))}
-                </View>
+                        ))}
+                    </View>
+                )}
             </View>
         </View>
     );
@@ -241,13 +240,13 @@ export default function ActDetail() {
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Technical Requirements</Text>
                 <View style={styles.infoBox}>
-                    <Text style={styles.infoLabel}>Tech Rider</Text>
-                    <Text style={styles.infoValue}>{displayAct.technical_specs || "Standard setup. No special requirements."}</Text>
+                    <Text style={styles.infoLabel}>Tech Rider & Specs</Text>
+                    <Text style={styles.infoValue}>{displayAct.technical_specs || "Standard performance requirements. No special technical needs listed."}</Text>
                 </View>
                 {displayAct.technical_rider_url && (
                     <Pressable style={styles.downloadBtn} onPress={() => Linking.openURL(displayAct.technical_rider_url)}>
                         <FileText color={COLORS.primary} size={20} />
-                        <Text style={styles.downloadBtnText}>View Full Rider (PDF)</Text>
+                        <Text style={styles.downloadBtnText}>View Tech Rider (PDF)</Text>
                     </Pressable>
                 )}
             </View>
@@ -258,6 +257,8 @@ export default function ActDetail() {
         <View style={styles.tabContent}>
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Booking Packages</Text>
+                <Text style={styles.sectionSubtitle}>Select a package to view booking details and availability.</Text>
+
                 {displayAct.packages && displayAct.packages.length > 0 ? (
                     displayAct.packages.map((pkg: any, i: number) => (
                         <View key={i} style={styles.packageCard}>
@@ -267,19 +268,45 @@ export default function ActDetail() {
                                     {Math.round(parseInt(pkg.price || '0', 10) * MARGIN_MULTIPLIER).toLocaleString()} AED
                                 </Text>
                             </View>
-                            <View style={styles.packageMeta}>
-                                <Clock size={14} color={COLORS.textDim} />
-                                <Text style={styles.packageMetaText}>{pkg.duration || 'Flexible'}</Text>
+
+                            <View style={styles.packageMetaRow}>
+                                <View style={styles.packageMeta}>
+                                    <Clock size={14} color={COLORS.primary} />
+                                    <Text style={styles.packageMetaText}>{pkg.duration || '60 mins'}</Text>
+                                </View>
+                                {pkg.sets && (
+                                    <View style={[styles.packageMeta, { marginLeft: 16 }]}>
+                                        <Star size={14} color={COLORS.primary} />
+                                        <Text style={styles.packageMetaText}>{pkg.sets} Sets</Text>
+                                    </View>
+                                )}
                             </View>
+
                             <Text style={styles.packageDesc}>{pkg.description}</Text>
+
+                            {pkg.includes && pkg.includes.length > 0 && (
+                                <View style={styles.packageFeatures}>
+                                    {pkg.includes.map((feat: string, idx: number) => (
+                                        <View key={idx} style={styles.featureItem}>
+                                            <CheckCircle2 color={COLORS.primary} size={14} />
+                                            <Text style={styles.featureText}>{feat}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
                             <Pressable style={styles.bookNowBtn} onPress={() => handleBookPackage(pkg)}>
-                                <Text style={styles.bookNowBtnText}>Book Now</Text>
+                                <Text style={styles.bookNowBtnText}>Select & Book</Text>
                             </Pressable>
                         </View>
                     ))
                 ) : (
                     <View style={styles.emptyBox}>
-                        <Text style={styles.emptyText}>No packages listed. Contact for a custom quote.</Text>
+                        <Info size={40} color={COLORS.textDim} style={{ marginBottom: 12 }} />
+                        <Text style={styles.emptyText}>Contact the artist directly for custom booking options.</Text>
+                        <Pressable style={styles.inquireBtn}>
+                            <Text style={styles.inquireBtnText}>Inquire for Quote</Text>
+                        </Pressable>
                     </View>
                 )}
             </View>
@@ -475,11 +502,52 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     dot: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
+        width: 4,
+        height: 4,
+        borderRadius: 2,
         backgroundColor: COLORS.textDim,
-        marginHorizontal: 8,
+        marginHorizontal: 10,
+        opacity: 0.5,
+    },
+    ratingText: {
+        color: '#FFD700',
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginLeft: 4,
+    },
+    header: {
+        backgroundColor: COLORS.background,
+    },
+    coverImageContainer: {
+        height: 380,
+        width: '100%',
+        position: 'relative',
+    },
+    coverOverlay: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    backButtonAbsolute: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 30,
+        left: 20,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
+    },
+    headerContent: {
+        paddingHorizontal: 20,
+        marginTop: -60,
+        alignItems: 'center',
+    },
+    artistNameHeader: {
+        color: COLORS.text,
+        fontSize: 32,
+        fontWeight: '900',
+        textAlign: 'center',
     },
     taglineRow: {
         flexDirection: 'row',
@@ -508,16 +576,37 @@ const styles = StyleSheet.create({
     },
     checkAvailabilityBtn: {
         backgroundColor: COLORS.primary,
-        paddingHorizontal: 30,
+        paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 25,
-        width: '100%',
+        flex: 1,
         alignItems: 'center',
     },
     checkAvailabilityBtnText: {
         color: COLORS.background,
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '800',
+    },
+    bookNowSecondaryBtn: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 25,
+        flex: 1,
+        alignItems: 'center',
+    },
+    bookNowSecondaryBtnText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    ctaRow: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+        marginTop: 20,
     },
     tabsContainer: {
         backgroundColor: COLORS.background,
@@ -563,7 +652,12 @@ const styles = StyleSheet.create({
         color: COLORS.text,
         fontSize: 20,
         fontWeight: 'bold',
-        marginBottom: 15,
+        marginBottom: 8,
+    },
+    sectionSubtitle: {
+        color: COLORS.textDim,
+        fontSize: 14,
+        marginBottom: 20,
     },
     bioText: {
         color: COLORS.textDim,
@@ -686,6 +780,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+    },
+    packageMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 12,
     },
     packageMetaText: {
@@ -697,6 +795,22 @@ const styles = StyleSheet.create({
         fontSize: 14,
         lineHeight: 20,
         marginBottom: 15,
+    },
+    packageFeatures: {
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 15,
+        gap: 8,
+    },
+    featureItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    featureText: {
+        color: COLORS.text,
+        fontSize: 13,
     },
     bookNowBtn: {
         backgroundColor: COLORS.primary,
@@ -721,6 +835,18 @@ const styles = StyleSheet.create({
         color: COLORS.textDim,
         textAlign: 'center',
         fontSize: 14,
+        marginBottom: 20,
+    },
+    inquireBtn: {
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    inquireBtnText: {
+        color: COLORS.primary,
+        fontWeight: 'bold',
     },
     reviewCard: {
         backgroundColor: COLORS.surface,

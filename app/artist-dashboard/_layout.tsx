@@ -9,6 +9,7 @@ import {
     ChevronLeft,
     CreditCard,
     HelpCircle,
+    Inbox,
     LayoutDashboard,
     LogOut,
     MessageSquare,
@@ -32,6 +33,7 @@ const MENU_GROUPS = [
         title: 'Manage profile',
         items: [
             { title: 'DASHBOARD', icon: LayoutDashboard, route: '/artist-dashboard' as any },
+            { title: 'Requests', icon: Inbox, route: '/artist-dashboard/requests' as any },
             { title: 'Bookings', icon: Briefcase, route: '/artist-dashboard/bookings' as any },
             { title: 'Calendar', icon: Calendar, route: '/artist-dashboard/calendar' as any },
             { title: 'Reviews', icon: MessageSquare, route: '/artist-dashboard/reviews' as any },
