@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase';
 export interface ActProfile {
     name: string;
     avatar_url: string;
-    country: string;
-    city: string;
 }
 
 export interface Review {
@@ -66,13 +64,13 @@ export function useAct(id: string | string[]) {
                 .from('acts')
                 .select(`
                     *,
-                    profile:profiles(name, avatar_url, country, city),
+                    profile:owner_id(name, avatar_url),
                     reviews(
                         id,
                         rating,
                         comment,
                         created_at,
-                        profile:profiles(name, avatar_url)
+                        profile:reviewer_id(name, avatar_url)
                     )
                 `)
                 .eq('id', id)
