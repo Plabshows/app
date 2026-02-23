@@ -6,8 +6,8 @@ import {
     ScrollView,
     StyleSheet, Text, View
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../src/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../../../src/constants/theme';
 
 const MOCK_BOOKINGS = [
     { id: '1', client: 'Sarah Johnson', event: 'Corporate Gala', date: '2024-04-15', time: '19:00', status: 'confirmed', price: '$800' },
@@ -63,15 +63,7 @@ export default function MyBookingsScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>My Bookings</Text>
-                <Pressable style={styles.calendarToggle}>
-                    <CalendarIcon size={20} color={COLORS.primary} />
-                    <Text style={styles.calendarToggleText}>Switch to Calendar</Text>
-                </Pressable>
-            </View>
-
+        <View style={styles.container}>
             {/* Horizontal Scrollable Tabs */}
             <View style={styles.tabBarContainer}>
                 <ScrollView
@@ -100,7 +92,7 @@ export default function MyBookingsScreen() {
                 renderItem={({ item }) => <BookingCard item={item} />}
                 contentContainerStyle={[
                     styles.listContent,
-                    { paddingBottom: insets.bottom + 100 }
+                    { paddingBottom: insets.bottom + 120 }
                 ]}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -110,30 +102,16 @@ export default function MyBookingsScreen() {
                     </View>
                 }
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    header: {
-        flexDirection: 'row', justifyContent: 'space-between',
-        alignItems: 'center', padding: SPACING.m
-    },
-    title: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
-    calendarToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-        backgroundColor: 'rgba(204, 255, 0, 0.1)'
-    },
-    calendarToggleText: { color: COLORS.primary, marginLeft: 8, fontWeight: '700', fontSize: 13 },
-
     tabBarContainer: {
         borderBottomWidth: 1,
-        borderBottomColor: '#222'
+        borderBottomColor: '#1A1A1A',
+        paddingTop: 16
     },
     tabBar: {
         flexDirection: 'row',
@@ -154,9 +132,7 @@ const styles = StyleSheet.create({
     listContent: { padding: SPACING.m },
     card: {
         backgroundColor: '#111111', borderRadius: 16, padding: 16,
-        marginBottom: 16, borderWidth: 1, borderColor: '#222',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1, shadowRadius: 4, elevation: 2
+        marginBottom: 16, borderWidth: 1, borderColor: '#1A1A1A',
     },
     cardHeader: {
         flexDirection: 'row', justifyContent: 'space-between',
@@ -175,7 +151,7 @@ const styles = StyleSheet.create({
     cardFooter: {
         flexDirection: 'row', justifyContent: 'space-between',
         alignItems: 'center', borderTopWidth: 1,
-        borderTopColor: '#222', paddingTop: 12
+        borderTopColor: '#1A1A1A', paddingTop: 12
     },
     detailsRow: { flexDirection: 'row', alignItems: 'center' },
     detailItem: { flexDirection: 'row', alignItems: 'center' },
@@ -183,12 +159,12 @@ const styles = StyleSheet.create({
 
     statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
     statusBadgeText: { fontSize: 10, fontWeight: '800' },
-    confirmedBadge: { backgroundColor: 'rgba(204, 255, 0, 0.2)' },
+    confirmedBadge: { backgroundColor: 'rgba(204, 255, 0, 0.15)' },
     confirmedText: { color: COLORS.primary },
     pendingBadge: { backgroundColor: 'rgba(255, 152, 0, 0.15)' },
     pendingText: { color: '#FF9800' },
-    pastBadge: { backgroundColor: '#333' },
-    pastText: { color: '#9CA3AF' },
+    pastBadge: { backgroundColor: '#1A1A1A' },
+    pastText: { color: COLORS.textDim },
 
     emptyContainer: {
         flex: 1, alignItems: 'center',

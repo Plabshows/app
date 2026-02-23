@@ -1,16 +1,8 @@
 import { Check, ChevronDown, Zap } from 'lucide-react-native';
 import React, { useState } from 'react';
-import {
-    LayoutAnimation, Platform,
-    Pressable,
-    ScrollView, StyleSheet,
-    Switch,
-    Text,
-    UIManager,
-    View
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../src/constants/theme';
+import { LayoutAnimation, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, UIManager, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../../../src/constants/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -41,12 +33,13 @@ export default function ProMembershipScreen() {
     const insets = useSafeAreaInsets();
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
-                    { paddingBottom: insets.bottom + 100 }
+                    { paddingBottom: insets.bottom + 120 }
                 ]}
+                showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
                     <View style={styles.zapCircle}>
@@ -98,7 +91,7 @@ export default function ProMembershipScreen() {
                                 <Text style={styles.featureText}>Priority Search Placement</Text>
                             </View>
                             <View style={styles.featureItem}>
-                                <Check size={18} color={COLORS.orange} />
+                                <Check size={18} color={COLORS.primary} />
                                 <Text style={styles.featureText}>Detailed Profile Analytics</Text>
                             </View>
                         </View>
@@ -125,25 +118,22 @@ export default function ProMembershipScreen() {
                         answer="We occasionally offer 14-day free trials to selected artists. Check your notifications for special invites!"
                     />
                 </View>
-
-                <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    scrollContent: { padding: SPACING.m },
-    header: { alignItems: 'center', marginTop: SPACING.l, marginBottom: SPACING.xl },
+    scrollContent: { padding: SPACING.m, paddingTop: 40 },
+    header: { alignItems: 'center', marginBottom: SPACING.xl },
     zapCircle: {
         width: 64, height: 64, borderRadius: 32,
-        backgroundColor: 'rgba(204, 255, 0, 0.1)', justifyContent: 'center', // Original Neon Lime light background
+        backgroundColor: 'rgba(204, 255, 0, 0.1)', justifyContent: 'center',
         alignItems: 'center', marginBottom: 16
     },
     title: { fontSize: 28, fontWeight: '800', color: COLORS.text, textAlign: 'center' },
     subtitle: { fontSize: 16, color: COLORS.textDim, textAlign: 'center', marginTop: 8, lineHeight: 24 },
-
     toggleContainer: {
         flexDirection: 'row', alignItems: 'center',
         justifyContent: 'center', marginBottom: SPACING.xl
@@ -156,13 +146,10 @@ const styles = StyleSheet.create({
         paddingVertical: 4, borderRadius: 12, marginLeft: 8
     },
     discountText: { color: COLORS.primary, fontSize: 10, fontWeight: '800' },
-
     cardsContainer: { marginBottom: SPACING.xl },
     card: {
         backgroundColor: '#111111', borderRadius: 24, padding: 24,
-        borderWidth: 1, borderColor: '#222',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1, shadowRadius: 12, elevation: 4
+        borderWidth: 1, borderColor: '#222'
     },
     centerCard: { borderColor: COLORS.primary, borderWidth: 2 },
     planName: { fontSize: 18, fontWeight: '700', color: COLORS.primary, marginBottom: 8 },
@@ -171,17 +158,14 @@ const styles = StyleSheet.create({
     price: { fontSize: 48, fontWeight: '800', color: COLORS.text },
     period: { fontSize: 18, color: COLORS.textDim, marginLeft: 4 },
     cardDesc: { color: COLORS.textDim, marginBottom: 24 },
-
     featuresList: { marginBottom: 32 },
     featureItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     featureText: { fontSize: 16, color: COLORS.text, marginLeft: 12 },
-
     upgradeButton: {
         backgroundColor: COLORS.primary, paddingVertical: 16,
         borderRadius: 16, alignItems: 'center'
     },
     upgradeButtonText: { color: COLORS.background, fontSize: 18, fontWeight: '700' },
-
     faqSection: { marginTop: SPACING.l },
     sectionHeader: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 16 },
     faqWrapper: { borderBottomWidth: 1, borderBottomColor: '#222', paddingVertical: 16 },
@@ -189,7 +173,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        minHeight: 48, // Better touch target
+        minHeight: 48,
     },
     faqQuestion: { fontSize: 16, fontWeight: '600', color: COLORS.text, flex: 1, paddingRight: 10 },
     faqAnswer: { fontSize: 15, color: COLORS.textDim, marginTop: 12, lineHeight: 22 }

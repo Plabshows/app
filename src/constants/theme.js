@@ -1,7 +1,8 @@
 export const COLORS = {
   background: '#050505', // Deep Black
-  primary: '#F97316',    // Primary Orange (shadcn/tailwind style)
-  orange: '#F97316',
+  primary: '#CCFF00',    // Neon Lime (Original Brand Color)
+  lime: '#CCFF00',
+  orange: '#CCFF00',    // Reverted from orange-500 back to Neon Lime for brand consistency
   gray: {
     50: '#F9FAFB',
     100: '#F3F4F6',

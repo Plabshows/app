@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(204, 255, 0, 0.3)',
+    borderColor: 'rgba(190, 242, 100, 0.3)',
   },
   categoryText: {
     color: COLORS.textDim,

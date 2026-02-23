@@ -4,8 +4,8 @@ import {
     Pressable,
     ScrollView, StyleSheet, Text, View
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../src/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, SPACING } from '../../../src/constants/theme';
 
 const MOCK_INVOICES = [
     { id: '1', date: 'Mar 1, 2024', amount: '$199.00', status: 'Paid', plan: 'Annual Pro' },
@@ -15,15 +15,14 @@ const MOCK_INVOICES = [
 export default function BillingScreen() {
     const insets = useSafeAreaInsets();
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             <ScrollView
                 contentContainerStyle={[
                     styles.scrollContent,
-                    { paddingBottom: insets.bottom + 100 }
+                    { paddingBottom: insets.bottom + 120 }
                 ]}
+                showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>Billing</Text>
-
                 {/* Active Plan */}
                 <View style={styles.planCard}>
                     <View>
@@ -44,7 +43,7 @@ export default function BillingScreen() {
                             style={styles.addButton}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Plus size={18} color={COLORS.orange} />
+                            <Plus size={18} color={COLORS.primary} />
                             <Text style={styles.addButtonText}>Add</Text>
                         </Pressable>
                     </View>
@@ -52,10 +51,10 @@ export default function BillingScreen() {
                     <View style={styles.cardItem}>
                         <View style={styles.cardInfo}>
                             <View style={styles.cardIconBox}>
-                                <CreditCard size={20} color="#374151" />
+                                <CreditCard size={20} color="#D1D5DB" />
                             </View>
                             <View>
-                                <Text style={styles.cardInfo}>Visa ending in 4242</Text>
+                                <Text style={styles.cardName}>Visa ending in 4242</Text>
                                 <Text style={styles.cardExpiry}>Expires 12/26 • Default</Text>
                             </View>
                         </View>
@@ -99,31 +98,26 @@ export default function BillingScreen() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    scrollContent: { padding: SPACING.m },
-    title: { fontSize: 28, fontWeight: '800', color: COLORS.text, marginBottom: 24 },
-
+    scrollContent: { padding: SPACING.m, paddingTop: 30 },
     planCard: {
         backgroundColor: '#111', borderRadius: 20, padding: 24,
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-        marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2, shadowRadius: 20, elevation: 8,
-        borderWidth: 1, borderColor: '#222'
+        marginBottom: 32, borderWidth: 1, borderColor: '#222'
     },
     planLabel: { color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, fontWeight: '600', marginBottom: 4 },
     planTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginBottom: 4 },
     planPrice: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 },
     statusBadge: {
-        backgroundColor: '#DCFCE7', paddingHorizontal: 10,
+        backgroundColor: 'rgba(204, 255, 0, 0.15)', paddingHorizontal: 10,
         paddingVertical: 4, borderRadius: 12
     },
-    statusBadgeText: { color: '#166534', fontSize: 10, fontWeight: '800' },
-
+    statusBadgeText: { color: COLORS.primary, fontSize: 10, fontWeight: '800' },
     section: { marginBottom: 32 },
     sectionHeader: {
         flexDirection: 'row', justifyContent: 'space-between',
@@ -132,7 +126,6 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
     addButton: { flexDirection: 'row', alignItems: 'center' },
     addButtonText: { color: COLORS.primary, fontWeight: '600', marginLeft: 4 },
-
     cardItem: {
         flexDirection: 'row', justifyContent: 'space-between',
         alignItems: 'center', backgroundColor: '#1A1A1A',
@@ -148,7 +141,6 @@ const styles = StyleSheet.create({
     cardName: { fontSize: 16, fontWeight: '600', color: COLORS.text },
     cardExpiry: { fontSize: 13, color: COLORS.textDim, marginTop: 2 },
     editLink: { color: COLORS.primary, fontWeight: '600' },
-
     invoiceItem: {
         flexDirection: 'row', justifyContent: 'space-between',
         alignItems: 'center', paddingVertical: 16,
@@ -169,7 +161,6 @@ const styles = StyleSheet.create({
         width: 32, height: 32, borderRadius: 8,
         backgroundColor: 'rgba(204, 255, 0, 0.1)', justifyContent: 'center', alignItems: 'center'
     },
-
     customerPortalButton: {
         flexDirection: 'row', justifyContent: 'space-between',
         alignItems: 'center', backgroundColor: '#1A1A1A',
