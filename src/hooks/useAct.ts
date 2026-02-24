@@ -63,47 +63,87 @@ export function useAct(id: string | string[]) {
             setLoading(true);
             setError(null);
 
-            // Fetch act with joined profile and category
-            const { data, error: fetchError } = await supabase
+            // Step 1: Fetch the act with its category
+            const { data: actData, error: actError } = await supabase
                 .from('acts')
                 .select(`
                     *,
-                    profile:profiles!owner_id(name, avatar_url, banner_url, managed_by_admin),
-                    category_data:categories(name),
-                    reviews(
-                        id,
-                        rating,
-                        comment,
-                        created_at,
-                        profile:profiles!reviewer_id(name, avatar_url)
-                    )
+                    category_data:categories(name)
                 `)
                 .eq('id', actId)
                 .single();
 
-            if (fetchError) {
-                console.error('Supabase fetch error:', fetchError);
-                throw fetchError;
+            if (actError) {
+                console.error('[useAct] Supabase act fetch error:', actError);
+                throw actError;
             }
 
-            if (data) {
-                // Map the joined data for easier consumption
-                const mappedData: ActDetailData = {
-                    ...data,
-                    category: (data.category_data as any)?.name || data.category || 'Artist',
-                    artistName: (data.profile as any)?.name || data.name || 'Artist',
-                    avatar_url: (data.profile as any)?.avatar_url,
-                    banner_url: (data.profile as any)?.banner_url,
-                    location: data.location_base || 'Dubai, UAE',
-                    reviews: data.reviews || [],
-                    packages: data.packages || []
-                };
-                setAct(mappedData);
-            } else {
+            if (!actData) {
                 setError(new Error('No data returned for act ID: ' + actId));
+                return;
             }
+
+            // Step 2: Fetch the owner's profile separately (avoids FK join issues)
+            let ownerProfile: ActProfile | null = null;
+            if (actData.owner_id) {
+                const { data: profileData, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('name, avatar_url, banner_url, managed_by_admin')
+                    .eq('id', actData.owner_id)
+                    .single();
+
+                if (profileError) {
+                    console.warn('[useAct] Could not fetch owner profile:', profileError.message);
+                } else {
+                    ownerProfile = profileData;
+                }
+            }
+
+            // Step 3: Fetch reviews separately
+            let reviews: Review[] = [];
+            try {
+                const { data: reviewData } = await supabase
+                    .from('reviews')
+                    .select('id, rating, comment, created_at, reviewer_id')
+                    .eq('act_id', actId)
+                    .order('created_at', { ascending: false });
+
+                if (reviewData && reviewData.length > 0) {
+                    // Fetch reviewer profiles
+                    const reviewerIds = reviewData.map(r => r.reviewer_id).filter(Boolean);
+                    const { data: reviewerProfiles } = await supabase
+                        .from('profiles')
+                        .select('id, name, avatar_url')
+                        .in('id', reviewerIds);
+
+                    const profileMap = new Map((reviewerProfiles || []).map(p => [p.id, p]));
+
+                    reviews = reviewData.map(r => ({
+                        ...r,
+                        profile: profileMap.get(r.reviewer_id) || { name: 'Client', avatar_url: '' },
+                    }));
+                }
+            } catch (revErr) {
+                console.warn('[useAct] Reviews fetch skipped:', revErr);
+            }
+
+            // Step 4: Map all data for the UI
+            const mappedData: ActDetailData = {
+                ...actData,
+                category: (actData.category_data as any)?.name || actData.category || 'Artist',
+                artistName: ownerProfile?.name || actData.name || 'Artist',
+                avatar_url: ownerProfile?.avatar_url || '',
+                banner_url: ownerProfile?.banner_url || '',
+                location: actData.location_base || 'International',
+                profile: ownerProfile || undefined,
+                reviews,
+                packages: actData.packages || [],
+            };
+
+            console.log('[useAct] Loaded act:', mappedData.id, '→', mappedData.artistName);
+            setAct(mappedData);
         } catch (e: any) {
-            console.error('Error fetching act in hook:', e);
+            console.error('[useAct] Error fetching act:', e);
             setError(e);
         } finally {
             setLoading(false);
