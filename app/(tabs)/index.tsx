@@ -36,6 +36,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
+const DEFAULT_ACT_IMAGE = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000&auto=format&fit=crop';
+
+// Helper: get the best available image for an act
+const getActImage = (act: any): string => {
+  if (act.image_url && !act.image_url.includes('blob:')) return act.image_url;
+  if (act.photos_url && act.photos_url.length > 0) {
+    const first = act.photos_url[0];
+    if (first && !first.includes('blob:')) return first;
+  }
+  return DEFAULT_ACT_IMAGE;
+};
+
 
 const TOP_CATEGORIES = [
   { id: 'musician', name: 'Musician', icon: Music },
@@ -273,7 +285,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}
           renderItem={({ item }) => (
             <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-              <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
+              <Image source={{ uri: getActImage(item) }} style={styles.featuredImage} />
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
                 style={styles.featuredGradient}
@@ -317,7 +329,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}
           renderItem={({ item }) => (
             <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-              <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
+              <Image source={{ uri: getActImage(item) }} style={styles.featuredImage} />
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
                 style={styles.featuredGradient}
