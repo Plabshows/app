@@ -244,11 +244,16 @@ export default function ArtistProfileWizard() {
                 }
             }
 
-            Alert.alert('Success', 'Profile wizard completed!');
+            Alert.alert('Success', 'Profile updated successfully!', [
+                {
+                    text: 'View Profile',
+                    onPress: () => router.replace('/profile'),
+                },
+            ]);
             await refreshAuth();
         } catch (err: any) {
             console.error('Final Save Error:', err);
-            Alert.alert('Save Error', err.message || 'Failed to save profile.');
+            Alert.alert('Save Error', err.message || 'Failed to save profile. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -324,6 +329,40 @@ export default function ArtistProfileWizard() {
             >
                 {renderStep()}
             </KeyboardAvoidingView>
+
+            {/* --- PERSISTENT BOTTOM BAR --- */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
+                {/* Save Changes Button — always visible */}
+                <Pressable
+                    style={[
+                        styles.saveButton,
+                        saving && styles.saveButtonDisabled,
+                    ]}
+                    onPress={handleFinalSave}
+                    disabled={saving}
+                >
+                    {saving ? (
+                        <View style={styles.savingRow}>
+                            <ActivityIndicator size="small" color={COLORS.background} />
+                            <Text style={styles.saveButtonText}>  Saving...</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.saveButtonText}>💾  Save Changes</Text>
+                    )}
+                </Pressable>
+
+                {/* Next Step Button */}
+                {currentStep < TOTAL_STEPS && (
+                    <Pressable
+                        style={styles.nextButton}
+                        onPress={() => setCurrentStep(currentStep + 1)}
+                    >
+                        <Text style={styles.nextButtonText}>
+                            Next: {STEPS_LABELS[currentStep]} →
+                        </Text>
+                    </Pressable>
+                )}
+            </View>
         </View>
     );
 }
@@ -380,5 +419,45 @@ const styles = StyleSheet.create({
     },
     tabTextActive: {
         color: COLORS.background,
+    },
+
+    // --- BOTTOM BAR ---
+    bottomBar: {
+        backgroundColor: '#0A0A0A',
+        borderTopWidth: 1,
+        borderTopColor: '#1A1A1A',
+        paddingHorizontal: SPACING.m,
+        paddingTop: 12,
+        gap: 8,
+    },
+    saveButton: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+    },
+    saveButtonDisabled: {
+        opacity: 0.6,
+    },
+    saveButtonText: {
+        color: COLORS.background,
+        fontSize: 16,
+        fontWeight: '800' as const,
+    },
+    savingRow: {
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+    },
+    nextButton: {
+        backgroundColor: '#1A1A1A',
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center' as const,
+    },
+    nextButtonText: {
+        color: COLORS.text,
+        fontSize: 14,
+        fontWeight: '600' as const,
     },
 });
