@@ -148,13 +148,19 @@ export default function ArtistProfileWizard() {
         setSaving(true);
         try {
             // 1. Update Profile
-            await supabase.from('profiles').update({
+            // Auto-assign avatar from first photo if not already set
+            const firstPhoto = formData.photos_url?.[0] || null;
+            const profileUpdate: any = {
                 name: formData.full_name,
                 city: formData.city,
                 country: formData.country,
                 payment_iban: formData.payment_iban,
                 payment_bank_name: formData.payment_bank_name,
-            }).eq('id', user.id);
+            };
+            if (firstPhoto) {
+                profileUpdate.avatar_url = firstPhoto;
+            }
+            await supabase.from('profiles').update(profileUpdate).eq('id', user.id);
 
             // 2. Upsert Act
             const { data: act, error: actError } = await supabase.from('acts').upsert({
@@ -162,6 +168,8 @@ export default function ArtistProfileWizard() {
                 name: formData.act_name,
                 description: formData.bio,
                 category_id: formData.category_id || undefined,
+                // 🎯 Auto-assign first photo as main image
+                image_url: firstPhoto || undefined,
                 photos_url: formData.photos_url,
                 videos_url: formData.videos_url,
                 experience_years: formData.experience_years,

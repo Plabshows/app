@@ -79,17 +79,28 @@ export default function ProfileScreen() {
         </Pressable>
     );
 
+    // Derive cover and avatar from real DB data
+    const coverImage = artistAct?.image_url
+        || (Array.isArray(artistAct?.photos_url) && artistAct.photos_url[0])
+        || profile?.avatar_url
+        || null;
+    const avatarImage = profile?.avatar_url
+        || artistAct?.image_url
+        || (Array.isArray(artistAct?.photos_url) && artistAct.photos_url[0])
+        || null;
+    const displayLocation = [profile?.city, profile?.country].filter(Boolean).join(', ') || 'Location not set';
+
     const ProfileHeader = () => (
         <View style={styles.headerSection}>
             <Image
-                source={{ uri: profile?.cover_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop' }}
+                source={coverImage ? { uri: coverImage } : { uri: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop' }}
                 style={styles.coverPhoto}
             />
 
             <View style={styles.profileInfoContainer}>
                 <View style={styles.avatarContainer}>
                     <Image
-                        source={{ uri: profile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop' }}
+                        source={avatarImage ? { uri: avatarImage } : { uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop' }}
                         style={styles.avatar}
                     />
                     <Pressable style={styles.cameraButton}>
@@ -98,9 +109,9 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={styles.nameSection}>
-                    <Text style={styles.nameText}>{profile?.name || 'Artist Name'}</Text>
+                    <Text style={styles.nameText}>{artistAct?.name || profile?.name || 'Artist Name'}</Text>
                     <Text style={styles.locationText}>
-                        Dubai, UAE • {artistAct?.artist_type || 'Specialty Act'}
+                        {displayLocation} • {artistAct?.artist_type || 'Specialty Act'}
                     </Text>
                     {/* Membership Badge */}
                     <View style={styles.membershipBadge}>
