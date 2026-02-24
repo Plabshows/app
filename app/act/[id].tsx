@@ -25,12 +25,16 @@ export default function ActDetail() {
     // Refs for scroll-to-section
     const scrollViewRef = useRef<ScrollView>(null);
     const sectionRefs = useRef<Record<string, number>>({});
+    const mainContentOffsetRef = useRef(0);
+    const STICKY_NAV_HEIGHT = 50; // Height of the sticky nav bar in px
 
     const scrollToSection = useCallback((sectionId: string) => {
         setActiveSection(sectionId);
-        const y = sectionRefs.current[sectionId];
-        if (y !== undefined && scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({ y: y - 60, animated: true });
+        const sectionY = sectionRefs.current[sectionId];
+        if (sectionY !== undefined && scrollViewRef.current) {
+            // Absolute position = mainContent offset + section offset within mainContent - nav height
+            const absoluteY = mainContentOffsetRef.current + sectionY - STICKY_NAV_HEIGHT - 10;
+            scrollViewRef.current.scrollTo({ y: Math.max(0, absoluteY), animated: true });
         }
     }, []);
 
@@ -444,10 +448,14 @@ export default function ActDetail() {
                 showsVerticalScrollIndicator={false}
                 onScroll={(e) => {
                     // Update active section based on scroll position
-                    const y = e.nativeEvent.contentOffset.y + 80;
-                    const sections = TABS.map(t => ({ id: t.id, y: sectionRefs.current[t.id] || 0 }));
+                    const scrollY = e.nativeEvent.contentOffset.y;
+                    const offset = mainContentOffsetRef.current;
+                    const sections = TABS.map(t => ({
+                        id: t.id,
+                        y: offset + (sectionRefs.current[t.id] || 0),
+                    }));
                     for (let i = sections.length - 1; i >= 0; i--) {
-                        if (y >= sections[i].y - 100) {
+                        if (scrollY >= sections[i].y - STICKY_NAV_HEIGHT - 60) {
                             setActiveSection(sections[i].id);
                             break;
                         }
@@ -457,7 +465,10 @@ export default function ActDetail() {
             >
                 {renderHeader()}
                 {renderNav()}
-                <View style={styles.mainContent}>
+                <View
+                    style={styles.mainContent}
+                    onLayout={(e) => { mainContentOffsetRef.current = e.nativeEvent.layout.y; }}
+                >
                     {/* --- BIOGRAPHY SECTION --- */}
                     <View onLayout={(e) => { sectionRefs.current['biography'] = e.nativeEvent.layout.y; }}>
                         {renderBiography()}
