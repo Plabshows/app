@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 export interface ActProfile {
     name: string;
     avatar_url: string;
+    banner_url?: string;
     managed_by_admin?: boolean;
 }
 
@@ -39,6 +40,7 @@ export interface ActDetailData {
     is_pro: boolean;
     artistName: string;
     avatar_url: string;
+    banner_url?: string;
     location: string;
     profile?: ActProfile;
     reviews?: Review[];
@@ -66,7 +68,7 @@ export function useAct(id: string | string[]) {
                 .from('acts')
                 .select(`
                     *,
-                    profile:profiles!owner_id(name, avatar_url, managed_by_admin),
+                    profile:profiles!owner_id(name, avatar_url, banner_url, managed_by_admin),
                     category_data:categories(name),
                     reviews(
                         id,
@@ -91,6 +93,7 @@ export function useAct(id: string | string[]) {
                     category: (data.category_data as any)?.name || data.category || 'Artist',
                     artistName: (data.profile as any)?.name || data.name || 'Artist',
                     avatar_url: (data.profile as any)?.avatar_url,
+                    banner_url: (data.profile as any)?.banner_url,
                     location: data.location_base || 'Dubai, UAE',
                     reviews: data.reviews || [],
                     packages: data.packages || []

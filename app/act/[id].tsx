@@ -43,7 +43,8 @@ export default function ActDetail() {
         technical_rider_url: '',
         is_verified: true,
         is_pro: false,
-        avatar_url: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png',
+        avatar_url: '',
+        banner_url: '',
         location: 'Dubai, UAE'
     };
 
@@ -59,6 +60,16 @@ export default function ActDetail() {
     const videos = useMemo(() => displayAct.videos_url || [], [displayAct]);
     const photos = useMemo(() => displayAct.photos_url || [], [displayAct]);
     const mainYtId = useMemo(() => getYouTubeID(displayAct.video_url || ''), [displayAct]);
+
+    // Derive the best cover image: banner_url > image_url > first photo > placeholder
+    const coverImageUrl = displayAct.banner_url
+        || displayAct.image_url
+        || photos[0]
+        || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop';
+    const avatarUrl = displayAct.avatar_url
+        || displayAct.image_url
+        || photos[0]
+        || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200';
 
     // Rating logic
     const reviews = displayAct.reviews || [];
@@ -112,7 +123,7 @@ export default function ActDetail() {
                     />
                 ) : (
                     <Image
-                        source={{ uri: photos[0] || 'https://euphonious-kelpie-cd0a27.netlify.app/images/hero-bg.jpg' }}
+                        source={{ uri: coverImageUrl }}
                         style={styles.coverImage}
                     />
                 )}
@@ -131,7 +142,7 @@ export default function ActDetail() {
             <View style={styles.headerContent}>
                 <View style={styles.avatarContainer}>
                     <Image
-                        source={{ uri: displayAct.avatar_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
+                        source={{ uri: avatarUrl }}
                         style={styles.avatar}
                     />
                     {displayAct.is_verified && (
