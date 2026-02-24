@@ -3,7 +3,7 @@ import { ActDetailData, useAct } from '@/src/hooks/useAct';
 import { ResizeMode, Video } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Star, Video as VideoIcon } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -20,7 +20,19 @@ export default function ActDetail() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const { act, loading, error } = useAct(id);
-    const [activeTab, setActiveTab] = useState('biography');
+    const [activeSection, setActiveSection] = useState('biography');
+
+    // Refs for scroll-to-section
+    const scrollViewRef = useRef<ScrollView>(null);
+    const sectionRefs = useRef<Record<string, number>>({});
+
+    const scrollToSection = useCallback((sectionId: string) => {
+        setActiveSection(sectionId);
+        const y = sectionRefs.current[sectionId];
+        if (y !== undefined && scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: y - 60, animated: true });
+        }
+    }, []);
 
     // Placeholder Act for resilience
     const PLACEHOLDER_ACT: ActDetailData = {
@@ -176,19 +188,19 @@ export default function ActDetail() {
         </View>
     );
 
-    const renderTabs = () => (
-        <View style={styles.tabsContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollContent}>
+    const renderNav = () => (
+        <View style={styles.navContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScrollContent}>
                 {TABS.map((tab) => (
                     <Pressable
                         key={tab.id}
-                        onPress={() => setActiveTab(tab.id)}
-                        style={[styles.tabItem, activeTab === tab.id && styles.activeTabItem]}
+                        onPress={() => scrollToSection(tab.id)}
+                        style={[styles.navItem, activeSection === tab.id && styles.navItemActive]}
                     >
-                        <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+                        <Text style={[styles.navText, activeSection === tab.id && styles.navTextActive]}>
                             {tab.label}
                         </Text>
-                        {activeTab === tab.id && <View style={styles.tabIndicator} />}
+                        {activeSection === tab.id && <View style={styles.navIndicator} />}
                     </Pressable>
                 ))}
             </ScrollView>
@@ -426,15 +438,62 @@ export default function ActDetail() {
 
     return (
         <View style={styles.container}>
-            <ScrollView stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                ref={scrollViewRef}
+                stickyHeaderIndices={[1]}
+                showsVerticalScrollIndicator={false}
+                onScroll={(e) => {
+                    // Update active section based on scroll position
+                    const y = e.nativeEvent.contentOffset.y + 80;
+                    const sections = TABS.map(t => ({ id: t.id, y: sectionRefs.current[t.id] || 0 }));
+                    for (let i = sections.length - 1; i >= 0; i--) {
+                        if (y >= sections[i].y - 100) {
+                            setActiveSection(sections[i].id);
+                            break;
+                        }
+                    }
+                }}
+                scrollEventThrottle={100}
+            >
                 {renderHeader()}
-                {renderTabs()}
+                {renderNav()}
                 <View style={styles.mainContent}>
-                    {activeTab === 'biography' && renderBiography()}
-                    {activeTab === 'media' && renderMedia()}
-                    {activeTab === 'requirements' && renderRequirements()}
-                    {activeTab === 'packages' && renderPackages()}
-                    {activeTab === 'reviews' && renderReviews()}
+                    {/* --- BIOGRAPHY SECTION --- */}
+                    <View onLayout={(e) => { sectionRefs.current['biography'] = e.nativeEvent.layout.y; }}>
+                        {renderBiography()}
+                    </View>
+
+                    {/* --- Divider --- */}
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- MEDIA SECTION --- */}
+                    <View onLayout={(e) => { sectionRefs.current['media'] = e.nativeEvent.layout.y; }}>
+                        {renderMedia()}
+                    </View>
+
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- REQUIREMENTS SECTION --- */}
+                    <View onLayout={(e) => { sectionRefs.current['requirements'] = e.nativeEvent.layout.y; }}>
+                        {renderRequirements()}
+                    </View>
+
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- PACKAGES SECTION --- */}
+                    <View onLayout={(e) => { sectionRefs.current['packages'] = e.nativeEvent.layout.y; }}>
+                        {renderPackages()}
+                    </View>
+
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- REVIEWS SECTION --- */}
+                    <View onLayout={(e) => { sectionRefs.current['reviews'] = e.nativeEvent.layout.y; }}>
+                        {renderReviews()}
+                    </View>
+
+                    {/* Bottom padding for last section */}
+                    <View style={{ height: 100 }} />
                 </View>
             </ScrollView>
         </View>
@@ -674,37 +733,42 @@ const styles = StyleSheet.create({
         width: '100%',
         marginTop: 20,
     },
-    tabsContainer: {
+    navContainer: {
         backgroundColor: COLORS.background,
         borderBottomWidth: 1,
         borderBottomColor: '#222',
         paddingVertical: 10,
     },
-    tabsScrollContent: {
+    navScrollContent: {
         paddingHorizontal: 20,
         gap: 25,
     },
-    tabItem: {
+    navItem: {
         paddingVertical: 8,
         position: 'relative',
     },
-    activeTabItem: {
+    navItemActive: {
     },
-    tabText: {
+    navText: {
         color: COLORS.textDim,
         fontSize: 15,
         fontWeight: '600',
     },
-    activeTabText: {
+    navTextActive: {
         color: COLORS.primary,
     },
-    tabIndicator: {
+    navIndicator: {
         position: 'absolute',
         bottom: -10,
         left: 0,
         right: 0,
         height: 2,
         backgroundColor: COLORS.primary,
+    },
+    sectionDivider: {
+        height: 1,
+        backgroundColor: '#1A1A1A',
+        marginVertical: 10,
     },
     mainContent: {
         padding: 20,
