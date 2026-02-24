@@ -1,7 +1,6 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Bell, Calendar, MessageCircle, User, Users } from 'lucide-react-native';
 import React from 'react';
-import { Platform } from 'react-native';
 
 import { COLORS } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -16,18 +15,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: COLORS.primary, // Brand Neon Lime
         tabBarInactiveTintColor: '#6B7280', // Gray-500 for inactive
         tabBarStyle: {
-          backgroundColor: '#050505', // Restored Dark Background
-          borderTopWidth: 1,
-          borderTopColor: '#1A1A1A', // Subtler dark border
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 32 : 12,
-          paddingTop: 8,
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          elevation: 0,
-          shadowColor: 'transparent',
+          display: 'none',
         },
         headerShown: false,
         tabBarShowLabel: true,

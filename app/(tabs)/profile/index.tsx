@@ -38,16 +38,19 @@ export default function ProfileScreen() {
     const [localAvatar, setLocalAvatar] = useState<string | null>(null);
     const [localBanner, setLocalBanner] = useState<string | null>(null);
 
-    // Derive cover and avatar from real DB data + local overrides
+    // Helper: skip generic Unsplash placeholder URLs
+    const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
+
+    // Derive cover and avatar from real DB data + local overrides (skip Unsplash generics)
     const coverImage = localBanner
-        || profile?.banner_url
-        || artistAct?.image_url
-        || (Array.isArray(artistAct?.photos_url) && artistAct.photos_url[0])
+        || (isRealPhoto(profile?.banner_url) ? profile.banner_url : null)
+        || (isRealPhoto(artistAct?.image_url) ? artistAct.image_url : null)
+        || (Array.isArray(artistAct?.photos_url) && isRealPhoto(artistAct.photos_url[0]) ? artistAct.photos_url[0] : null)
         || null;
     const avatarImage = localAvatar
-        || profile?.avatar_url
-        || artistAct?.image_url
-        || (Array.isArray(artistAct?.photos_url) && artistAct.photos_url[0])
+        || (isRealPhoto(profile?.avatar_url) ? profile.avatar_url : null)
+        || (isRealPhoto(artistAct?.image_url) ? artistAct.image_url : null)
+        || (Array.isArray(artistAct?.photos_url) && isRealPhoto(artistAct.photos_url[0]) ? artistAct.photos_url[0] : null)
         || null;
     const displayLocation = [profile?.city, profile?.country].filter(Boolean).join(', ') || 'Location not set';
 
@@ -251,7 +254,7 @@ export default function ProfileScreen() {
             {/* Banner with edit button */}
             <View style={{ position: 'relative' }}>
                 <Image
-                    source={coverImage ? { uri: coverImage } : { uri: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop' }}
+                    source={coverImage ? { uri: coverImage } : { uri: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png' }}
                     style={styles.coverPhoto}
                 />
                 <Pressable
@@ -266,7 +269,7 @@ export default function ProfileScreen() {
                 {/* Avatar with edit button */}
                 <View style={styles.avatarContainer}>
                     <Image
-                        source={avatarImage ? { uri: avatarImage } : { uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop' }}
+                        source={avatarImage ? { uri: avatarImage } : { uri: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
                         style={styles.avatar}
                     />
                     <Pressable
@@ -430,6 +433,18 @@ export default function ProfileScreen() {
                 <View style={styles.sectionDivider} />
 
                 <View style={styles.contentLayout}>
+                    {(profile?.is_admin || profile?.role === 'admin') && (
+                        <MenuSection title="Administration">
+                            <MenuItem
+                                icon={Shield}
+                                title="Admin Hub"
+                                subtitle="Manage platform"
+                                onPress={() => router.push('/admin' as any)}
+                                color={COLORS.primary}
+                            />
+                        </MenuSection>
+                    )}
+
                     <MenuSection title="Dashboard">
                         <MenuItem
                             icon={Calendar}

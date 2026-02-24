@@ -42,7 +42,8 @@ export default function UnifiedEditProfile() {
         artist_type: '',
         genre: '',
         bio: '',
-        price_guide: ''
+        price_guide: '',
+        video_url: ''
     });
 
     const [modalVisible, setModalVisible] = useState(false);
@@ -84,7 +85,8 @@ export default function UnifiedEditProfile() {
                 artist_type: act?.artist_type || '',
                 genre: act?.genre || '',
                 bio: act?.description || '',
-                price_guide: act?.price_guide || ''
+                price_guide: act?.price_guide || '',
+                video_url: act?.video_url || ''
             });
 
             // Ensure existingPhotoUrl is a string (the first photo)
@@ -224,6 +226,7 @@ export default function UnifiedEditProfile() {
                     genre: profileData.genre,
                     description: profileData.bio,
                     price_guide: profileData.price_guide,
+                    video_url: profileData.video_url,
                     // 🎯 image_url = main cover image (used in cards/listings)
                     image_url: coverImageUrl,
                     // photos_url = full gallery array
@@ -389,6 +392,17 @@ export default function UnifiedEditProfile() {
                             onChangeText={t => setProfileData({ ...profileData, bio: t })}
                             multiline
                             placeholder="Tell clients about your act..."
+                            placeholderTextColor={COLORS.textDim}
+                        />
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Video URL (YouTube/Vimeo)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={profileData.video_url}
+                            onChangeText={t => setProfileData({ ...profileData, video_url: t })}
+                            placeholder="https://www.youtube.com/watch?v=..."
                             placeholderTextColor={COLORS.textDim}
                         />
                     </View>

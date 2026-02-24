@@ -7,9 +7,14 @@ type AuthContextType = {
     user: User | null;
     profile: any | null;
     artistAct: any | null;
+    impersonatedProfile: any | null;
+    impersonatedAct: any | null;
+    isImpersonating: boolean;
     loading: boolean;
     signOut: () => Promise<void>;
     refreshAuth: () => Promise<void>;
+    startImpersonation: (userId: string) => Promise<void>;
+    stopImpersonation: () => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,9 +22,14 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     profile: null,
     artistAct: null,
+    impersonatedProfile: null,
+    impersonatedAct: null,
+    isImpersonating: false,
     loading: true,
     signOut: async () => { },
     refreshAuth: async () => { },
+    startImpersonation: async () => { },
+    stopImpersonation: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -27,8 +37,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<any | null>(null);
     const [artistAct, setArtistAct] = useState<any | null>(null);
+    const [impersonatedProfile, setImpersonatedProfile] = useState<any | null>(null);
+    const [impersonatedAct, setImpersonatedAct] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
-    const initialized = React.useRef(false);
 
     const fetchProfileData = async (userId: string) => {
         try {
@@ -63,6 +74,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
+    const startImpersonation = async (userId: string) => {
+        if (!profile?.is_admin && profile?.role !== 'admin') {
+            console.error('Only admins can impersonate users.');
+            return;
+        }
+
+        try {
+            const { data: prof } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            const { data: act } = await supabase
+                .from('acts')
+                .select('*')
+                .eq('owner_id', userId)
+                .single();
+
+            setImpersonatedProfile(prof);
+            setImpersonatedAct(act);
+            console.log(`[Auth] Impersonating user: ${userId}`);
+        } catch (err) {
+            console.error('Error starting impersonation:', err);
+        }
+    };
+
+    const stopImpersonation = () => {
+        setImpersonatedProfile(null);
+        setImpersonatedAct(null);
+        console.log('[Auth] Impersonation stopped');
+    };
+
     useEffect(() => {
         let mounted = true;
 
@@ -77,6 +121,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } else if (mounted) {
                 setProfile(null);
                 setArtistAct(null);
+                setImpersonatedProfile(null);
+                setImpersonatedAct(null);
                 setLoading(false);
             }
         };
@@ -128,12 +174,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(null);
             setProfile(null);
             setArtistAct(null);
+            setImpersonatedProfile(null);
+            setImpersonatedAct(null);
             setLoading(false);
         }
     };
 
     return (
-        <AuthContext.Provider value={{ session, user, profile, artistAct, loading, signOut, refreshAuth }}>
+        <AuthContext.Provider value={{
+            session,
+            user,
+            profile,
+            artistAct,
+            impersonatedProfile,
+            impersonatedAct,
+            isImpersonating: !!impersonatedProfile,
+            loading,
+            signOut,
+            refreshAuth,
+            startImpersonation,
+            stopImpersonation
+        }}>
             {children}
         </AuthContext.Provider>
     );

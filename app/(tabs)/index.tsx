@@ -36,18 +36,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-const DEFAULT_ACT_IMAGE = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000&auto=format&fit=crop';
-
-// Helper: get the best available image for an act
-const getActImage = (act: any): string => {
-  if (act.image_url && !act.image_url.includes('blob:')) return act.image_url;
-  if (act.photos_url && act.photos_url.length > 0) {
-    const first = act.photos_url[0];
-    if (first && !first.includes('blob:')) return first;
-  }
-  return DEFAULT_ACT_IMAGE;
-};
-
 
 const TOP_CATEGORIES = [
   { id: 'musician', name: 'Musician', icon: Music },
@@ -260,6 +248,17 @@ export default function DiscoverScreen() {
     );
   };
 
+  // --- IMAGE & DATA HELPERS ---
+  const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
+
+  const getArtistImage = (item: any) => {
+    return (isRealPhoto(item.banner_url) ? item.banner_url : null)
+      || (isRealPhoto(item.avatar_url) ? item.avatar_url : null)
+      || (Array.isArray(item.photos_url) && isRealPhoto(item.photos_url[0]) ? item.photos_url[0] : null)
+      || (item.image_url && isRealPhoto(item.image_url) ? item.image_url : null)
+      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
+  };
+
   const renderFeatured = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -285,7 +284,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}
           renderItem={({ item }) => (
             <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-              <Image source={{ uri: getActImage(item) }} style={styles.featuredImage} />
+              <Image source={{ uri: getArtistImage(item) }} style={styles.featuredImage} />
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
                 style={styles.featuredGradient}
@@ -299,7 +298,7 @@ export default function DiscoverScreen() {
                 </View>
                 <Text style={styles.featuredTitle} numberOfLines={1}>{(item as any).name || (item as any).title}</Text>
                 <Text style={styles.featuredCategory}>{item.category}</Text>
-                <Text style={styles.featuredLocation}>{(item as any).location || 'Dubai, UAE'}</Text>
+                <Text style={styles.featuredLocation}>{(item as any).location_base || (item as any).location || 'Dubai, UAE'}</Text>
               </View>
             </Pressable>
           )}
@@ -329,7 +328,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}
           renderItem={({ item }) => (
             <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-              <Image source={{ uri: getActImage(item) }} style={styles.featuredImage} />
+              <Image source={{ uri: getArtistImage(item) }} style={styles.featuredImage} />
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
                 style={styles.featuredGradient}
@@ -375,7 +374,6 @@ export default function DiscoverScreen() {
     </View>
   );
 
-
   const renderRoaming = () => {
     const roamingActs = acts.filter(act => act.category === 'Roaming');
     if (roamingActs.length === 0) return null;
@@ -396,7 +394,7 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}
           renderItem={({ item }) => (
             <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
-              <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
+              <Image source={{ uri: getArtistImage(item) }} style={styles.featuredImage} />
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
                 style={styles.featuredGradient}
@@ -404,7 +402,7 @@ export default function DiscoverScreen() {
               <View style={styles.featuredContent}>
                 <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.featuredCategory}>{item.category}</Text>
-                <Text style={styles.featuredLocation}>International</Text>
+                <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
               </View>
             </Pressable>
           )}

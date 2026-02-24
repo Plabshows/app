@@ -8,8 +8,11 @@ export interface Act {
     title?: string;
     category: string;
     image_url: string;
+    banner_url?: string;
+    avatar_url?: string;
     video_url?: string;
     location?: string;
+    location_base?: string;
     description?: string;
     technical_specs?: string;
     specs?: string;
@@ -53,7 +56,11 @@ export function useActs() {
 
             let supabaseQuery = supabase
                 .from('acts')
-                .select('*, category:categories(name, slug)')
+                .select(`
+                    *,
+                    category:categories(name, slug),
+                    profile:profiles!acts_owner_id_fkey(banner_url, avatar_url)
+                `)
                 .eq('is_published', true);
 
             if (category) {
@@ -71,7 +78,9 @@ export function useActs() {
             if (data && data.length > 0) {
                 const mappedData = data.map((act: any) => ({
                     ...act,
-                    category: act.category?.name || 'Uncategorized'
+                    category: act.category?.name || 'Uncategorized',
+                    banner_url: act.profile?.banner_url,
+                    avatar_url: act.profile?.avatar_url
                 }));
                 setActs(mappedData);
             } else if (!query && !category) {

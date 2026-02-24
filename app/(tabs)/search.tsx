@@ -36,19 +36,28 @@ export default function SearchScreen() {
     return matchesSearch && matchesCategory;
   });
 
-  const renderItem = ({ item }: { item: Act }) => (
-    <Pressable
-      style={styles.card}
-      onPress={() => router.push(`/act/${item.id}`)}
-    >
-      <Image source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} style={styles.cardImage} />
-      <View style={styles.cardContent}>
-        <Text style={styles.cardCategory}>{item.category}</Text>
-        <Text style={styles.cardTitle}>{item.name || item.title}</Text>
-        <Text style={styles.cardPrice}>{item.price_guide || item.price_range || 'Contact for price'}</Text>
-      </View>
-    </Pressable>
-  );
+  const renderItem = ({ item }: { item: Act }) => {
+    const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
+    const displayImage = (isRealPhoto(item.banner_url) ? item.banner_url : null)
+      || (isRealPhoto(item.avatar_url) ? item.avatar_url : null)
+      || (Array.isArray(item.photos_url) && isRealPhoto(item.photos_url[0]) ? item.photos_url[0] : null)
+      || (item.image_url && isRealPhoto(item.image_url) ? item.image_url : null)
+      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
+
+    return (
+      <Pressable
+        style={styles.card}
+        onPress={() => router.push(`/act/${item.id}`)}
+      >
+        <Image source={{ uri: displayImage }} style={styles.cardImage} />
+        <View style={styles.cardContent}>
+          <Text style={styles.cardCategory}>{item.category}</Text>
+          <Text style={styles.cardTitle}>{item.name || item.title}</Text>
+          <Text style={styles.cardPrice}>{item.price_guide || item.price_range || 'Contact for price'}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   if (loading) {
     return (

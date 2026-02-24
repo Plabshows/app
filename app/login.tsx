@@ -83,6 +83,36 @@ export default function LoginScreen() {
                             </View>
                         ) : null}
 
+                        {/* Social Login Buttons */}
+                        <View style={styles.socialContainer}>
+                            <Pressable
+                                style={[styles.socialButton, styles.googleButton]}
+                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+                            >
+                                <View style={styles.socialIconPlaceholder}>
+                                    <View style={[styles.googleDot, { backgroundColor: '#EA4335' }]} />
+                                    <View style={[styles.googleDot, { backgroundColor: '#4285F4' }]} />
+                                    <View style={[styles.googleDot, { backgroundColor: '#FBBC05' }]} />
+                                    <View style={[styles.googleDot, { backgroundColor: '#34A853' }]} />
+                                </View>
+                                <Text style={styles.socialButtonText}>Continue with Google</Text>
+                            </Pressable>
+
+                            <Pressable
+                                style={[styles.socialButton, styles.appleButton]}
+                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'apple' })}
+                            >
+                                <Mail size={20} color="white" style={styles.socialIcon} />
+                                <Text style={[styles.socialButtonText, { color: 'white' }]}>Continue with Apple</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.divider}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>OR</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
                         <View style={styles.inputContainer}>
                             <Text style={styles.label}>Email</Text>
                             <View style={styles.inputWrapper}>
@@ -183,5 +213,43 @@ const styles = StyleSheet.create({
     loginButtonText: { color: COLORS.background, fontWeight: 'bold', fontSize: 18 },
     signupLink: { marginTop: 24, alignItems: 'center' },
     signupLinkText: { color: COLORS.textDim, fontSize: 14 },
-    signupLinkHighlight: { color: COLORS.primary, fontWeight: 'bold' }
+    signupLinkHighlight: { color: COLORS.primary, fontWeight: 'bold' },
+    socialContainer: { marginBottom: 30 },
+    socialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    googleButton: { backgroundColor: 'white' },
+    appleButton: { backgroundColor: 'black' },
+    socialIcon: { marginRight: 12 },
+    socialButtonText: { fontSize: 16, fontWeight: 'bold', color: '#000' },
+    socialIconPlaceholder: {
+        flexDirection: 'row',
+        marginRight: 12,
+        width: 20,
+        justifyContent: 'space-between',
+    },
+    googleDot: { width: 4, height: 4, borderRadius: 2 },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#222',
+    },
+    dividerText: {
+        color: COLORS.textDim,
+        paddingHorizontal: 16,
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
 });

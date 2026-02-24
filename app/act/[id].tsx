@@ -50,7 +50,7 @@ export default function ActDetail() {
         artist_type: 'Solo',
         location_base: 'Dubai, UAE',
         experience_years: 5,
-        image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819',
+        image_url: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
         video_url: '',
         photos_url: [],
         videos_url: [],
@@ -59,8 +59,8 @@ export default function ActDetail() {
         technical_rider_url: '',
         is_verified: true,
         is_pro: false,
-        avatar_url: '',
-        banner_url: '',
+        avatar_url: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png',
+        banner_url: 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
         location: 'Dubai, UAE'
     };
 
@@ -77,15 +77,21 @@ export default function ActDetail() {
     const photos = useMemo(() => displayAct.photos_url || [], [displayAct]);
     const mainYtId = useMemo(() => getYouTubeID(displayAct.video_url || ''), [displayAct]);
 
-    // Derive the best cover image: banner_url > image_url > first photo > placeholder
-    const coverImageUrl = displayAct.banner_url
-        || displayAct.image_url
-        || photos[0]
-        || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop';
-    const avatarUrl = displayAct.avatar_url
-        || displayAct.image_url
-        || photos[0]
-        || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200';
+    // Helper: skip generic Unsplash placeholder URLs
+    const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
+
+    // Standardized Image Hierarchy: Banner (Portada) > Avatar (Perfil) > Photos[0] (Galería)
+    const coverImageUrl = (isRealPhoto(displayAct.banner_url) ? displayAct.banner_url : null)
+        || (isRealPhoto(displayAct.avatar_url) ? displayAct.avatar_url : null)
+        || (Array.isArray(photos) && isRealPhoto(photos[0]) ? photos[0] : null)
+        || (displayAct.image_url && isRealPhoto(displayAct.image_url) ? displayAct.image_url : null)
+        || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
+
+    const avatarUrl = (isRealPhoto(displayAct.avatar_url) ? displayAct.avatar_url : null)
+        || (isRealPhoto(displayAct.banner_url) ? displayAct.banner_url : null)
+        || (Array.isArray(photos) && isRealPhoto(photos[0]) ? photos[0] : null)
+        || (displayAct.image_url && isRealPhoto(displayAct.image_url) ? displayAct.image_url : null)
+        || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png'; // Brand-consistent fallback
 
     // Rating logic
     const reviews = displayAct.reviews || [];
@@ -100,7 +106,7 @@ export default function ActDetail() {
     const handleBookPackage = (pkg: any | null) => {
         // @ts-ignore - Dynamic route might not be captured by types yet
         router.push({
-            pathname: `/booking/${id}`,
+            pathname: `/booking/${id}` as any,
             params: {
                 packageData: pkg ? JSON.stringify(pkg) : null,
                 managedByAdmin: displayAct.profile?.managed_by_admin ? 'true' : 'false'

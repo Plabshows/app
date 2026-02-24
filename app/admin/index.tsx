@@ -1,6 +1,6 @@
 
 import { useRouter } from 'expo-router';
-import { RefreshCw } from 'lucide-react-native';
+import { CheckCircle, ChevronRight, Eye, MessageCircle, RefreshCw } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
+import { logAdminAction } from '../../src/lib/audit';
 import { supabase } from '../../src/lib/supabase';
 
 type PendingAct = {
@@ -206,17 +207,58 @@ export default function AdminDashboard() {
     const fetchAllActs = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('acts')
-                .select('*, profiles(name, email, is_published)')
-                .order('created_at', { ascending: false });
+            // 1. Fetch all profiles with their acts
+            const { data: profiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('*, acts(*)');
 
-            if (error) throw error;
-            setAllActs((data as any[] || []).map(act => ({
-                ...act,
-                name: act.name || act.title || 'Untitled Act',
-                owner_name: act.profiles?.name || act.profiles?.email || 'Unknown'
-            })));
+            // 2. Fetch all acts for potential orphans (acts without profiles)
+            const { data: acts, error: actsError } = await supabase
+                .from('acts')
+                .select('*');
+
+            if (profilesError) throw profilesError;
+            if (actsError) throw actsError;
+
+            const unifiedMap = new Map();
+
+            // Process profiles
+            (profiles || []).forEach(p => {
+                const actData = Array.isArray(p.acts) ? p.acts[0] : p.acts;
+                unifiedMap.set(p.id, {
+                    id: p.id,
+                    name: actData?.name || actData?.title || p.name || p.email || 'Unnamed',
+                    category: actData?.category || 'Sin Perfil Act',
+                    image_url: actData?.image_url || p.avatar_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png',
+                    owner_name: p.name || p.email || 'Admin/Directo',
+                    has_act: !!actData,
+                    is_published: p.is_published,
+                    role: p.role,
+                    created_at: p.created_at
+                });
+            });
+
+            // Catch orphans
+            (acts || []).forEach(act => {
+                const id = act.owner_id || act.id;
+                if (!unifiedMap.has(id)) {
+                    unifiedMap.set(id, {
+                        id: id,
+                        name: act.name || act.title || 'Orphan Act',
+                        category: act.category || 'Manual/Legacy',
+                        image_url: act.image_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png',
+                        owner_name: 'Manual Upload',
+                        has_act: true,
+                        is_published: false,
+                        role: 'artist',
+                        created_at: act.created_at
+                    });
+                }
+            });
+
+            setAllActs(Array.from(unifiedMap.values()).sort((a, b) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            ));
         } catch (e) {
             console.log("Admin All Acts Error:", e);
         } finally {
@@ -283,6 +325,12 @@ export default function AdminDashboard() {
                 .eq('id', userId);
 
             if (error) throw error;
+
+            // Audit Log
+            if (user) {
+                await logAdminAction(user.id, userId, 'toggle_admin', { newValue: !currentStatus });
+            }
+
             fetchProfiles();
         } catch (e: any) {
             Alert.alert('Error', e.message);
@@ -297,6 +345,12 @@ export default function AdminDashboard() {
                 .eq('id', userId);
 
             if (error) throw error;
+
+            // Audit Log
+            if (user) {
+                await logAdminAction(user.id, userId, 'toggle_published', { newValue: !currentStatus });
+            }
+
             Alert.alert('Success', `${name} is now ${!currentStatus ? 'Published' : 'Unpublished'}`);
             if (activeTab === 'approvals') fetchPendingActs();
             else fetchProfiles();
@@ -334,31 +388,122 @@ export default function AdminDashboard() {
         </View>
     );
 
+    const renderApprovalItem = ({ item }: { item: PendingAct }) => (
+        <View style={styles.card}>
+            <Image source={{ uri: item.image_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png' }} style={styles.cardImage} />
+            <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.cardCategory}>{item.category}</Text>
+                <Text style={styles.cardDate}>Created: {new Date(item.created_at).toLocaleDateString()}</Text>
+            </View>
+            <View style={styles.actionButtons}>
+                <Pressable
+                    style={styles.approveButton}
+                    onPress={() => togglePublishedStatus(item.owner_id, false, item.name)}
+                >
+                    <CheckCircle size={16} color={COLORS.background} />
+                    <Text style={styles.approveText}>Approve</Text>
+                </Pressable>
+                <Pressable
+                    style={styles.deleteButton}
+                    onPress={() => router.push(`/admin/users/${item.owner_id}` as any)}
+                >
+                    <Eye size={16} color={COLORS.textDim} />
+                </Pressable>
+            </View>
+        </View>
+    );
+
+    const renderLeadItem = ({ item }: { item: Lead }) => (
+        <View style={styles.card}>
+            <View style={styles.cardContent}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={styles.cardTitle}>{item.client_name}</Text>
+                    <Text style={[styles.statusBadge, { color: item.status === 'Won' ? '#4CAF50' : COLORS.primary }]}>{item.status}</Text>
+                </View>
+                <Text style={styles.cardCategory}>Interest: {item.act_name}</Text>
+                <Text style={styles.cardDate}>Event: {item.event_date}</Text>
+            </View>
+            <Pressable
+                style={styles.waButton}
+                onPress={() => contactWhatsApp(item.client_whatsapp, item.client_name)}
+            >
+                <MessageCircle size={20} color="white" />
+            </Pressable>
+        </View>
+    );
+
+    const renderProfileItem = ({ item }: { item: Profile }) => (
+        <View style={styles.card}>
+            <Pressable
+                style={{ flex: 1 }}
+                onPress={() => router.push(`/admin/users/${item.id}` as any)}
+            >
+                <View style={styles.cardContent}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.cardTitle}>{item.name || 'Unnamed'}</Text>
+                        <ChevronRight size={18} color={COLORS.textDim} />
+                    </View>
+                    <Text style={styles.cardCategory}>{item.role?.toUpperCase()} • {item.email}</Text>
+                </View>
+            </Pressable>
+            <View style={{ gap: 8, alignItems: 'center' }}>
+                <Pressable
+                    style={[styles.approveButton, { backgroundColor: COLORS.primary, paddingHorizontal: 12 }]}
+                    onPress={() => router.push(`/admin/acts/${item.id}/dashboard` as any)}
+                >
+                    <Text style={[styles.approveText, { fontSize: 10, color: 'black' }]}>MANAGE DASH</Text>
+                </Pressable>
+                <Text style={[styles.switchLabel, { color: item.is_published ? COLORS.primary : '#F44336', fontSize: 10 }]}>
+                    {item.is_published ? 'PUBLIC' : 'PRIVATE'}
+                </Text>
+            </View>
+        </View>
+    );
+
     const renderActItem = ({ item }: { item: any }) => (
         <View style={styles.card}>
-            <Image source={{ uri: item.image_url || 'https://via.placeholder.com/100' }} style={styles.cardImage} />
+            <Image
+                source={{ uri: item.image_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
+                style={styles.cardImage}
+            />
             <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardCategory}>{item.category} • {item.owner_name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <View style={[styles.dot, { backgroundColor: item.profiles?.is_published ? '#4CAF50' : '#F44336' }]} />
-                    <Text style={styles.cardDate}>{item.profiles?.is_published ? 'Publicado' : 'Borrador'}</Text>
+                    <View style={[styles.dot, { backgroundColor: item.has_act ? (item.is_published ? '#4CAF50' : COLORS.primary) : '#F44336' }]} />
+                    <Text style={styles.cardDate}>
+                        {item.has_act ? (item.is_published ? 'Publicado' : 'Borrador') : 'Sin Perfil Act'}
+                    </Text>
                 </View>
             </View>
-            <Pressable
-                style={styles.deleteButton}
-                onPress={() => Alert.alert('Delete', 'Delete this act permanently?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Delete', style: 'destructive', onPress: async () => {
-                            await supabase.from('acts').delete().eq('id', item.id);
-                            fetchAllActs();
-                        }
-                    }
-                ])}
-            >
-                <Text style={{ color: '#F44336', fontSize: 10, fontWeight: 'bold' }}>DEL</Text>
-            </Pressable>
+            <View style={{ gap: 8 }}>
+                <Pressable
+                    style={[styles.approveButton, { backgroundColor: COLORS.primary }]}
+                    onPress={() => router.push(`/admin/acts/${item.id}/dashboard` as any)}
+                >
+                    <Text style={[styles.approveText, { color: 'black' }]}>
+                        {item.has_act ? 'Manage Dash' : 'Create Act'}
+                    </Text>
+                </Pressable>
+
+                {item.has_act && (
+                    <Pressable
+                        style={styles.deleteButton}
+                        onPress={() => Alert.alert('Delete', 'Delete this act record permanently?', [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                                text: 'Delete', style: 'destructive', onPress: async () => {
+                                    await supabase.from('acts').delete().eq('owner_id', item.id);
+                                    fetchAllActs();
+                                }
+                            }
+                        ])}
+                    >
+                        <Text style={{ color: '#F44336', fontSize: 10, fontWeight: 'bold', textAlign: 'center' }}>DEL ACT</Text>
+                    </Pressable>
+                )}
+            </View>
         </View>
     );
 

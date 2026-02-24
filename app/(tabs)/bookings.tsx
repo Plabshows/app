@@ -21,9 +21,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AuthGate from '@/src/components/AuthGate';
+import { useAuth } from '@/src/context/AuthContext';
+
 export default function BookingsScreen() {
     const router = useRouter();
-    const [session, setSession] = useState<any>(null);
+    const { user, loading: authLoading } = useAuth();
     const [bookings, setBookings] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -31,27 +34,15 @@ export default function BookingsScreen() {
     const [requests, setRequests] = useState<any[]>([]);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session) {
+        if (!authLoading) {
+            if (user) {
                 fetchBookings();
                 fetchRequests();
+            } else {
+                setLoading(false);
             }
-            else setLoading(false);
-        });
-
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            if (session) {
-                fetchBookings();
-                fetchRequests();
-            }
-        });
-
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
+        }
+    }, [user, authLoading]);
 
     const fetchBookings = async () => {
         try {
@@ -76,16 +67,13 @@ export default function BookingsScreen() {
 
     const fetchRequests = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
             const { data, error } = await supabase
                 .from('booking_requests')
                 .select(`
                     *,
                     act:acts(name, image_url, artist_type)
                 `)
-                .eq('client_id', user.id)
+                .eq('client_id', user?.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -111,14 +99,14 @@ export default function BookingsScreen() {
     };
 
     const renderBookingCard = ({ item }: { item: any }) => {
-        const isArtist = item.act.owner_id === session?.user.id;
+        const isArtist = item.act.owner_id === user?.id;
         const partner = isArtist ? item.client : item.act;
 
         return (
             <Pressable style={styles.bookingCard}>
                 <View style={styles.cardHeader}>
                     <Image
-                        source={{ uri: partner.image_url || 'https://images.unsplash.com/photo-1514525253361-bee8718a300c?q=80&w=200&auto=format&fit=crop' }}
+                        source={{ uri: partner.image_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
                         style={styles.cardImage}
                     />
                     <View style={styles.cardHeaderContent}>
@@ -174,7 +162,7 @@ export default function BookingsScreen() {
             >
                 <View style={styles.cardHeader}>
                     <Image
-                        source={{ uri: item.act?.image_url || 'https://images.unsplash.com/photo-1514525253361-bee8718a300c?q=80&w=200&auto=format&fit=crop' }}
+                        source={{ uri: item.act?.image_url || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png' }}
                         style={styles.cardImage}
                     />
                     <View style={styles.cardHeaderContent}>
@@ -213,7 +201,7 @@ export default function BookingsScreen() {
         );
     };
 
-    if (loading) {
+    if (authLoading || loading) {
         return (
             <View style={[styles.container, styles.center]}>
                 <ActivityIndicator color={COLORS.primary} size="large" />
@@ -221,15 +209,12 @@ export default function BookingsScreen() {
         );
     }
 
-    if (!session) {
+    if (!user) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.centerContainer}>
-                    <Calendar size={60} color={COLORS.primary} style={{ opacity: 0.5 }} />
-                    <Text style={styles.title}>Your Bookings</Text>
-                    <Text style={styles.subtitle}>Sign in to see your show history and upcoming performances.</Text>
-                </View>
-            </SafeAreaView>
+            <AuthGate
+                title="Your Bookings"
+                subtitle="Sign in to see your show history and upcoming performances."
+            />
         );
     }
 
