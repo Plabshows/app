@@ -217,34 +217,89 @@ export default function ActDetail() {
         </View>
     );
 
-    const renderMedia = () => (
-        <View style={styles.tabContent}>
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Gallery</Text>
-                {photos.length === 0 && videos.length === 0 ? (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyText}>No photos or videos uploaded yet.</Text>
+    const renderMedia = () => {
+        const hasMedia = photos.length > 0 || videos.length > 0;
+
+        return (
+            <View style={styles.tabContent}>
+                {/* --- VIDEO SECTION --- */}
+                {videos.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>🎥 Videos</Text>
+                        {videos.map((vid, i) => {
+                            const ytId = getYouTubeID(vid);
+                            if (ytId && Platform.OS === 'web') {
+                                // Web: Render iframe embed with 16:9 aspect ratio
+                                return (
+                                    <View key={`vid-${i}`} style={styles.videoEmbedContainer}>
+                                        <iframe
+                                            src={`https://www.youtube.com/embed/${ytId}`}
+                                            style={{
+                                                width: '100%',
+                                                aspectRatio: '16/9',
+                                                border: 'none',
+                                                borderRadius: 12,
+                                            }}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            title={`Video ${i + 1}`}
+                                        />
+                                    </View>
+                                );
+                            }
+                            // Native / non-YouTube: Render clickable thumbnail
+                            const thumbUrl = ytId
+                                ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`
+                                : null;
+                            return (
+                                <Pressable
+                                    key={`vid-${i}`}
+                                    style={styles.videoThumbCard}
+                                    onPress={() => Linking.openURL(vid)}
+                                >
+                                    {thumbUrl ? (
+                                        <Image source={{ uri: thumbUrl }} style={styles.videoThumbImage} />
+                                    ) : (
+                                        <View style={[styles.videoThumbImage, { backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                                            <VideoIcon color={COLORS.primary} size={32} />
+                                        </View>
+                                    )}
+                                    <View style={styles.playOverlay}>
+                                        <View style={styles.playButton}>
+                                            <VideoIcon color="#fff" size={28} />
+                                        </View>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
                     </View>
-                ) : (
-                    <View style={styles.mediaGrid}>
-                        {videos.map((vid, i) => (
-                            <Pressable key={`vid-${i}`} style={styles.mediaItem} onPress={() => Linking.openURL(vid)}>
-                                <Image source={{ uri: `https://img.youtube.com/vi/${getYouTubeID(vid)}/maxresdefault.jpg` }} style={styles.mediaImage} />
-                                <View style={styles.playOverlay}>
-                                    <VideoIcon color="#fff" size={24} />
+                )}
+
+                {/* --- PHOTOS SECTION --- */}
+                {photos.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>📸 Photos</Text>
+                        <View style={styles.mediaGrid}>
+                            {photos.map((photo, i) => (
+                                <View key={`photo-${i}`} style={styles.mediaItem}>
+                                    <Image source={{ uri: photo }} style={styles.mediaImage} />
                                 </View>
-                            </Pressable>
-                        ))}
-                        {photos.map((photo, i) => (
-                            <View key={`photo-${i}`} style={styles.mediaItem}>
-                                <Image source={{ uri: photo }} style={styles.mediaImage} />
-                            </View>
-                        ))}
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* --- EMPTY STATE --- */}
+                {!hasMedia && (
+                    <View style={styles.section}>
+                        <View style={styles.emptyBox}>
+                            <Text style={styles.emptyText}>No photos or videos uploaded yet.</Text>
+                        </View>
                     </View>
                 )}
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderRequirements = () => (
         <View style={styles.tabContent}>
@@ -899,5 +954,35 @@ const styles = StyleSheet.create({
         color: COLORS.textDim,
         fontSize: 14,
         lineHeight: 20,
+    },
+    // --- Video Embed Styles ---
+    videoEmbedContainer: {
+        width: '100%',
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 15,
+        backgroundColor: COLORS.surface,
+    },
+    videoThumbCard: {
+        width: '100%',
+        height: 220,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 15,
+        position: 'relative',
+    },
+    videoThumbImage: {
+        width: '100%',
+        height: '100%',
+    },
+    playButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
 });

@@ -253,13 +253,34 @@ export const PhotoStep = ({ data, updateData, onNext }: StepProps) => {
     );
 };
 
+// --- YouTube Helper Functions ---
+const getYouTubeID = (url: string): string | null => {
+    if (!url) return null;
+    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+};
+
+const getYouTubeEmbedUrl = (url: string): string | null => {
+    const id = getYouTubeID(url);
+    return id ? `https://www.youtube.com/embed/${id}` : null;
+};
+
+const getYouTubeThumbnail = (url: string): string | null => {
+    const id = getYouTubeID(url);
+    return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : null;
+};
+
 export const VideoStep = ({ data, updateData, onNext }: StepProps) => {
     const videos = data.videos_url || [];
     const [newUrl, setNewUrl] = React.useState('');
 
+    const isValidYouTube = getYouTubeID(newUrl) !== null;
+
     const addVideo = () => {
-        if (!newUrl) return;
-        updateData({ videos_url: [...videos, newUrl] });
+        if (!newUrl.trim()) return;
+        // Store the original URL — the public page will convert to embed format
+        updateData({ videos_url: [...videos, newUrl.trim()] });
         setNewUrl('');
     };
 
@@ -272,34 +293,75 @@ export const VideoStep = ({ data, updateData, onNext }: StepProps) => {
     return (
         <ScrollView contentContainerStyle={styles.stepContainer}>
             <Text style={styles.stepTitle}>Showreel & Videos</Text>
-            <Text style={styles.stepSubtitle}>Add YouTube or Vimeo links to showcase your talent.</Text>
+            <Text style={styles.stepSubtitle}>Add YouTube links to showcase your talent. Paste any YouTube URL — we'll handle the rest.</Text>
 
             <View style={styles.field}>
                 <Text style={styles.label}>Paste Video Link</Text>
                 <View style={[styles.row, { gap: 10 }]}>
                     <TextInput
-                        style={[styles.input, { flex: 1 }]}
+                        style={[styles.input, { flex: 1 }, isValidYouTube && { borderColor: '#4CAF50', borderWidth: 1 }]}
                         value={newUrl}
                         onChangeText={setNewUrl}
-                        placeholder="https://youtube.com/..."
+                        placeholder="https://youtube.com/watch?v=..."
                         placeholderTextColor={COLORS.textDim}
+                        autoCapitalize="none"
+                        autoCorrect={false}
                     />
-                    <Pressable style={styles.miniAddBtn} onPress={addVideo}>
+                    <Pressable
+                        style={[styles.miniAddBtn, !newUrl.trim() && { opacity: 0.4 }]}
+                        onPress={addVideo}
+                        disabled={!newUrl.trim()}
+                    >
                         <Plus size={24} color={COLORS.background} />
                     </Pressable>
                 </View>
+                {newUrl.length > 0 && !isValidYouTube && (
+                    <Text style={{ color: '#FF5252', fontSize: 12, marginTop: 4 }}>
+                        ⚠ Paste a valid YouTube link (youtube.com/watch?v=... or youtu.be/...)
+                    </Text>
+                )}
+                {isValidYouTube && (
+                    <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: 4 }}>
+                        ✓ Valid YouTube link detected
+                    </Text>
+                )}
             </View>
 
+            {videos.length > 0 && (
+                <Text style={[styles.label, { marginBottom: 10 }]}>
+                    {videos.length} Video{videos.length > 1 ? 's' : ''} Added
+                </Text>
+            )}
+
             <View style={styles.list}>
-                {videos.map((url: string, i: number) => (
-                    <View key={i} style={styles.videoItem}>
-                        <Play size={20} color={COLORS.primary} />
-                        <Text style={styles.videoUrlText} numberOfLines={1}>{url}</Text>
-                        <Pressable onPress={() => removeVideo(i)}>
-                            <X size={20} color="#FF5252" />
-                        </Pressable>
-                    </View>
-                ))}
+                {videos.map((url: string, i: number) => {
+                    const thumb = getYouTubeThumbnail(url);
+                    return (
+                        <View key={i} style={[styles.videoItem, { flexDirection: 'column', alignItems: 'stretch', padding: 0, overflow: 'hidden' }]}>
+                            {thumb ? (
+                                <Image
+                                    source={{ uri: thumb }}
+                                    style={{ width: '100%', height: 120, borderTopLeftRadius: 10, borderTopRightRadius: 10 }}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <View style={{ height: 60, backgroundColor: '#1A1A1A', borderTopLeftRadius: 10, borderTopRightRadius: 10, justifyContent: 'center', alignItems: 'center' }}>
+                                    <Play size={24} color={COLORS.primary} />
+                                </View>
+                            )}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, gap: 8 }}>
+                                <Play size={16} color={COLORS.primary} />
+                                <Text style={[styles.videoUrlText, { flex: 1 }]} numberOfLines={1}>{url}</Text>
+                                <Pressable
+                                    onPress={() => removeVideo(i)}
+                                    style={{ padding: 6, backgroundColor: 'rgba(255,82,82,0.15)', borderRadius: 8 }}
+                                >
+                                    <X size={18} color="#FF5252" />
+                                </Pressable>
+                            </View>
+                        </View>
+                    );
+                })}
             </View>
 
             <Pressable style={styles.nextButton} onPress={onNext}>
