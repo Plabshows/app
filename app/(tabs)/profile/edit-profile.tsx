@@ -162,26 +162,62 @@ export default function ArtistProfileWizard() {
             }
             await supabase.from('profiles').update(profileUpdate).eq('id', user.id);
 
-            // 2. Upsert Act
-            const { data: act, error: actError } = await supabase.from('acts').upsert({
+            // 2. Save Act — Check if exists first, then update or insert
+            const actPayload = {
                 owner_id: user.id,
-                name: formData.act_name,
-                description: formData.bio,
-                category_id: formData.category_id || undefined,
-                // 🎯 Auto-assign first photo as main image
-                image_url: firstPhoto || undefined,
-                photos_url: formData.photos_url,
-                videos_url: formData.videos_url,
-                experience_years: formData.experience_years,
-                notable_venues: formData.notable_venues,
-                technical_specs: formData.technical_specs,
-                technical_rider_url: formData.technical_rider_url,
-                travel_range: formData.travel_range,
-                instant_booking: formData.instant_booking,
-                faqs: formData.faq
-            }, { onConflict: 'owner_id' }).select().single();
+                name: formData.act_name || null,
+                description: formData.bio || null,
+                category_id: formData.category_id || null,
+                image_url: firstPhoto || null,
+                photos_url: formData.photos_url || [],
+                videos_url: formData.videos_url || [],
+                experience_years: formData.experience_years || 0,
+                notable_venues: formData.notable_venues || null,
+                technical_specs: formData.technical_specs || null,
+                technical_rider_url: formData.technical_rider_url || null,
+                travel_range: formData.travel_range || 50,
+                instant_booking: formData.instant_booking || false,
+                faqs: formData.faq || [],
+            };
 
-            if (actError) throw actError;
+            // Check if act already exists for this user
+            const { data: existingAct } = await supabase
+                .from('acts')
+                .select('id')
+                .eq('owner_id', user.id)
+                .maybeSingle();
+
+            let act: any = null;
+            let actError: any = null;
+
+            if (existingAct) {
+                // UPDATE existing act
+                console.log('[Wizard] Updating existing act:', existingAct.id);
+                const { data, error } = await supabase
+                    .from('acts')
+                    .update(actPayload)
+                    .eq('id', existingAct.id)
+                    .select()
+                    .single();
+                act = data;
+                actError = error;
+            } else {
+                // INSERT new act
+                console.log('[Wizard] Inserting new act');
+                const { data, error } = await supabase
+                    .from('acts')
+                    .insert(actPayload)
+                    .select()
+                    .single();
+                act = data;
+                actError = error;
+            }
+
+            if (actError) {
+                console.error('[Wizard] Act save error:', JSON.stringify(actError));
+                throw actError;
+            }
+            console.log('[Wizard] Act saved successfully:', act?.id);
 
             // 3. Update Sub-tables (Awards, Members, Packages)
             // Strategy: Clear and Re-insert for simplicity in the wizard
