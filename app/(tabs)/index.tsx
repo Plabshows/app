@@ -1,5 +1,6 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { useActs } from '@/src/hooks/useActs';
+import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -17,7 +18,7 @@ import {
   Wand,
   Zap
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -82,6 +83,32 @@ export default function DiscoverScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const { acts, loading, refetch } = useActs();
+  const [newActs, setNewActs] = useState<any[]>([]);
+
+  // --- FETCH NEWEST ARTISTS ---
+  useEffect(() => {
+    const fetchNewArtists = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('acts')
+          .select('*, category:categories(name, slug)')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (data && data.length > 0) {
+          const mapped = data.map((act: any) => ({
+            ...act,
+            category: act.category?.name || 'Uncategorized',
+          }));
+          setNewActs(mapped);
+        }
+        if (error) console.error('Error fetching new artists:', error);
+      } catch (err) {
+        console.error('Error fetching new artists:', err);
+      }
+    };
+    fetchNewArtists();
+  }, []);
 
   // --- REAL-TIME SEARCH & FILTER LOGIC ---
   React.useEffect(() => {
@@ -269,6 +296,50 @@ export default function DiscoverScreen() {
     </View>
   );
 
+  const renderNewArtists = () => {
+    if (newActs.length === 0) return null;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>New Artists</Text>
+          <View style={styles.newBadge}>
+            <Sparkles size={10} color={COLORS.background} />
+            <Text style={styles.newBadgeText}>NEW</Text>
+          </View>
+        </View>
+
+        <FlatList
+          horizontal
+          data={newActs}
+          keyExtractor={item => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SPACING.m }}
+          renderItem={({ item }) => (
+            <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
+              <Image source={{ uri: item.image_url }} style={styles.featuredImage} />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
+                style={styles.featuredGradient}
+              />
+              <View style={styles.featuredContent}>
+                <View style={styles.featuredTopRow}>
+                  <View style={[styles.ratingBadge, { backgroundColor: '#00d4ff' }]}>
+                    <Sparkles size={10} color={COLORS.background} />
+                    <Text style={styles.ratingText}>NEW</Text>
+                  </View>
+                </View>
+                <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.featuredCategory}>{item.category}</Text>
+                <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
+              </View>
+            </Pressable>
+          )}
+        />
+      </View>
+    );
+  };
+
   const renderCategories = () => (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { marginHorizontal: SPACING.m, marginBottom: SPACING.m }]}>Browse by Category</Text>
@@ -341,6 +412,7 @@ export default function DiscoverScreen() {
       >
         {renderHero()}
         {renderFeatured()}
+        {renderNewArtists()}
         {renderRoaming()}
         {renderCategories()}
       </ScrollView>
@@ -620,5 +692,20 @@ const styles = StyleSheet.create({
   activeCategoryText: {
     color: COLORS.primary,
     fontWeight: 'bold',
+  },
+  newBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00d4ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 4,
+  },
+  newBadgeText: {
+    color: COLORS.background,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });
