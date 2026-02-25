@@ -4,6 +4,8 @@ import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
+  Award,
+  CheckCircle,
   Cloud,
   Disc,
   Flame,
@@ -12,6 +14,7 @@ import {
   Monitor,
   Music,
   Search,
+  ShieldCheck,
   Sparkles,
   Star,
   Users,
@@ -139,7 +142,7 @@ export default function DiscoverScreen() {
   const renderHeader = () => (
     <View style={styles.fixedHeader}>
       <View style={styles.headerTopRow}>
-        <Text style={styles.locationText}>Showing artist in <Text style={styles.locationHighlight}>Ibiza</Text></Text>
+        <Text style={styles.locationText}>Performance Lab <Text style={styles.locationHighlight}>Ibiza</Text></Text>
       </View>
 
       <View style={styles.searchContainer}>
@@ -176,62 +179,83 @@ export default function DiscoverScreen() {
     </View>
   );
 
-  const renderHero = () => {
-    const HERO_DISCIPLINES = [
+  const renderAgencyHero = () => (
+    <View style={styles.agencyHeroContainer}>
+      <ImageBackground
+        source={require('../../assets/images/managed_agency_hero_bg.png')}
+        style={styles.agencyHeroBg}
+        resizeMode="cover"
+      >
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)', '#000']}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.agencyHeroContent}>
+          <View style={styles.managedBadge}>
+            <Star size={12} color="#000" fill="#000" />
+            <Text style={styles.managedBadgeText}>PERFORMANCE LAB</Text>
+          </View>
+          <Text style={styles.agencyHeroTitle}>Ibiza Premium Production</Text>
+          <Text style={styles.agencyHeroSubtitle}>
+            Full-service event entertainment. We curate, manage, and deliver unforgettable experiences.
+          </Text>
+          <Pressable style={styles.agencyHeroCTA} onPress={() => router.push('/(tabs)/search')}>
+            <Text style={styles.agencyHeroCTAText}>PLAN YOUR EVENT</Text>
+          </Pressable>
+        </View>
+      </ImageBackground>
+    </View>
+  );
+
+  const renderTrustBar = () => (
+    <View style={styles.trustBar}>
+      <View style={styles.trustItem}>
+        <ShieldCheck size={16} color={COLORS.primary} />
+        <Text style={styles.trustText}>Verified Talent</Text>
+      </View>
+      <View style={styles.trustItem}>
+        <CheckCircle size={16} color={COLORS.primary} />
+        <Text style={styles.trustText}>Secure Booking</Text>
+      </View>
+      <View style={styles.trustItem}>
+        <Award size={16} color={COLORS.primary} />
+        <Text style={styles.trustText}>Full Management</Text>
+      </View>
+    </View>
+  );
+
+  const renderCuratedSolutions = () => {
+    const SOLUTIONS = [
       {
-        key: 'Dancer',
-        label: 'Dancers',
-        copy: 'The heartbeat of every event',
-        accent: '#ccff00',
-        image: require('../../assets/images/disciplines/dancers.jpg'),
+        id: 'premium-event',
+        title: 'Premium Ibiza Event',
+        desc: 'Complete entertainment package for luxury villas and yachts.',
+        image: require('../../assets/images/premium_ibiza_event_hero.png'),
       },
       {
-        key: 'Musician',
-        label: 'Singers',
-        copy: 'Voices that fill the room',
-        accent: '#ff3cac',
-        image: require('../../assets/images/disciplines/singers.jpg'),
-      },
-      {
-        key: 'Circus',
-        label: 'Acrobats',
-        copy: 'Jaw-dropping showstoppers',
-        accent: '#00d4ff',
-        image: require('../../assets/images/disciplines/acrobats.jpg'),
-      },
+        id: 'sax-dancer',
+        title: 'Sax & Fire Dancer Duo',
+        desc: 'High-energy spectacular for club and beach residencies.',
+        image: require('../../assets/images/premium_ibiza_sax_dancer_hero.png'),
+      }
     ];
+
     return (
       <View style={styles.section}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: SPACING.m, gap: 14 }}
-          decelerationRate="fast"
-          snapToInterval={width - SPACING.m * 2 + 14}
-        >
-          {HERO_DISCIPLINES.map(disc => (
-            <Pressable
-              key={disc.key}
-              style={styles.heroCard}
-              onPress={() => router.push(`/(tabs)/search?category=${disc.key}`)}
-            >
-              <ImageBackground
-                source={disc.image}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.88)']}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={styles.heroContent}>
-                <View style={[styles.heroCategoryBadge, { backgroundColor: disc.accent + '22', borderColor: disc.accent + '66' }]}>
-                  <Text style={[styles.heroCategoryLabel, { color: disc.accent }]}>{disc.label.toUpperCase()}</Text>
-                </View>
-                <Text style={styles.heroTitle}>{disc.label}</Text>
-                <Text style={styles.heroSubtitle}>{disc.copy}</Text>
-                <View style={[styles.heroCTA, { backgroundColor: disc.accent }]}>
-                  <Text style={styles.heroCTAText}>Browse {disc.label} →</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Curated Experiences</Text>
+          <Text style={styles.seeAll}>See All</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.m, gap: SPACING.m }}>
+          {SOLUTIONS.map(sol => (
+            <Pressable key={sol.id} style={styles.solutionCard} onPress={() => router.push('/(tabs)/search')}>
+              <Image source={sol.image} style={styles.solutionImage} />
+              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
+              <View style={styles.solutionContent}>
+                <Text style={styles.solutionTitle}>{sol.title}</Text>
+                <Text style={styles.solutionDesc}>{sol.desc}</Text>
+                <View style={styles.solutionCTA}>
+                  <Text style={styles.solutionCTAText}>REQUEST QUOTE</Text>
                 </View>
               </View>
             </Pressable>
@@ -412,7 +436,9 @@ export default function DiscoverScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100, paddingTop: SPACING.s }}
       >
-        {renderHero()}
+        {renderAgencyHero()}
+        {renderTrustBar()}
+        {renderCuratedSolutions()}
         {renderFeatured()}
         {renderNewArtists()}
         {renderRoaming()}
@@ -709,5 +735,128 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  agencyHeroContainer: {
+    height: 280,
+    width: width - SPACING.m * 2,
+    marginHorizontal: SPACING.m,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: SPACING.m,
+  },
+  agencyHeroBg: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  agencyHeroContent: {
+    padding: SPACING.l,
+    zIndex: 10,
+  },
+  managedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: SPACING.s,
+    gap: 4,
+  },
+  managedBadgeText: {
+    color: '#000',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  agencyHeroTitle: {
+    color: COLORS.text,
+    fontSize: 26,
+    fontWeight: '900',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  agencyHeroSubtitle: {
+    color: COLORS.textDim,
+    fontSize: 14,
+    marginBottom: SPACING.m,
+    lineHeight: 20,
+  },
+  agencyHeroCTA: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  agencyHeroCTAText: {
+    color: '#000',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  trustBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.m,
+    marginBottom: SPACING.l,
+    backgroundColor: '#111',
+    marginHorizontal: SPACING.m,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  trustItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  trustText: {
+    color: COLORS.textDim,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  solutionCard: {
+    width: 280,
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  solutionImage: {
+    width: '100%',
+    height: '100%',
+  },
+  solutionContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: SPACING.m,
+  },
+  solutionTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  solutionDesc: {
+    color: COLORS.textDim,
+    fontSize: 12,
+    marginBottom: SPACING.s,
+  },
+  solutionCTA: {
+    backgroundColor: 'rgba(204, 255, 0, 0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(204, 255, 0, 0.5)',
+  },
+  solutionCTAText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

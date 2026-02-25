@@ -5,7 +5,7 @@ import { supabase } from '@/src/lib/supabase';
 import { ResizeMode, Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, Star, Video as VideoIcon } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, ShieldCheck, Star, Video as VideoIcon, Zap } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -339,7 +339,6 @@ export default function ActDetail() {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            {/* ... cover image block ... */}
             <Pressable
                 onPress={() => isEditing && pickImage('banner_url')}
                 style={styles.coverImageContainer}
@@ -359,13 +358,7 @@ export default function ActDetail() {
                         style={styles.coverImage}
                     />
                 )}
-                <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
-
-                {isEditing && (
-                    <View style={styles.imageEditOverlay}>
-                        <Text style={styles.imageEditLabel}>Change Cover Image</Text>
-                    </View>
-                )}
+                <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
 
                 {/* Back Button */}
                 <Pressable
@@ -375,6 +368,12 @@ export default function ActDetail() {
                     <ArrowLeft color="#fff" size={24} />
                 </Pressable>
 
+                {/* Performance Lab Management Badge */}
+                <View style={styles.agencyBadgeAbsolute}>
+                    <ShieldCheck size={14} color={COLORS.primary} />
+                    <Text style={styles.agencyBadgeText}>MANAGED BY PERFORMANCE LAB</Text>
+                </View>
+
                 {/* Admin/Owner Toggle */}
                 {canEdit && (
                     <Pressable
@@ -382,7 +381,7 @@ export default function ActDetail() {
                         onPress={() => setIsEditing(!isEditing)}
                     >
                         <Text style={styles.editToggleText}>
-                            {isEditing ? '👀 View Profile' : '✏️ Activar Modo Edición'}
+                            {isEditing ? '👀 View Profile' : '✏️ Modo Edición'}
                         </Text>
                     </Pressable>
                 )}
@@ -443,11 +442,30 @@ export default function ActDetail() {
 
                 <View style={styles.ctaRow}>
                     <Pressable style={styles.checkAvailabilityBtn} onPress={() => handleBookPackage(null)}>
-                        <Text style={styles.checkAvailabilityBtnText}>Check Availability</Text>
+                        <Zap size={18} color="#000" />
+                        <Text style={styles.checkAvailabilityBtnText}>CHECK AVAILABILITY</Text>
                     </Pressable>
-                    <Pressable style={styles.bookNowSecondaryBtn} onPress={() => handleBookPackage(displayAct.packages?.[0] || null)}>
-                        <Text style={styles.bookNowSecondaryBtnText}>Book Now</Text>
+                    <Pressable style={styles.bookNowSecondaryBtn} onPress={() => scrollToSection('packages')}>
+                        <Text style={styles.bookNowSecondaryBtnText}>VIEW PACKAGES</Text>
                     </Pressable>
+                </View>
+            </View>
+
+            {/* Trust Bar inside Act Detail */}
+            <View style={styles.inlineTrustBar}>
+                <View style={styles.trustItem}>
+                    <ShieldCheck size={16} color={COLORS.primary} />
+                    <Text style={styles.trustText}>Verified</Text>
+                </View>
+                <View style={styles.trustDivider} />
+                <View style={styles.trustItem}>
+                    <Zap size={16} color={COLORS.primary} />
+                    <Text style={styles.trustText}>Secure</Text>
+                </View>
+                <View style={styles.trustDivider} />
+                <View style={styles.trustItem}>
+                    <Package size={16} color={COLORS.primary} />
+                    <Text style={styles.trustText}>Full Service</Text>
                 </View>
             </View>
         </View>
@@ -686,7 +704,7 @@ export default function ActDetail() {
                             )}
 
                             <Pressable style={styles.bookNowBtn} onPress={() => handleBookPackage(pkg)}>
-                                <Text style={styles.bookNowBtnText}>Select & Book</Text>
+                                <Text style={styles.bookNowBtnText}>REQUEST QUOTE & BOOK</Text>
                             </Pressable>
                         </View>
                     ))
@@ -1481,5 +1499,51 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         marginTop: 10,
+    },
+    agencyBadgeAbsolute: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 54 : 34,
+        right: 20,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(204, 255, 0, 0.4)',
+    },
+    agencyBadgeText: {
+        color: COLORS.primary,
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+    inlineTrustBar: {
+        flexDirection: 'row',
+        backgroundColor: '#0A0A0A',
+        paddingVertical: 12,
+        marginTop: 20,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#1A1A1A',
+        justifyContent: 'space-around',
+    },
+    trustItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    trustText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    trustDivider: {
+        width: 1,
+        height: 12,
+        backgroundColor: '#222',
+        alignSelf: 'center',
     },
 });

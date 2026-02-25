@@ -1,7 +1,7 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CheckCircle2, Home, LogIn, MessageSquare } from 'lucide-react-native';
+import { CheckCircle2, Home, LogIn, MessageSquare, ShieldCheck } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,11 +37,16 @@ export default function BookingConfirmationScreen() {
 
                 <Text style={styles.title}>Request Sent!</Text>
 
+                <View style={styles.agencyBadge}>
+                    <ShieldCheck size={16} color={COLORS.primary} />
+                    <Text style={styles.agencyBadgeText}>PERFORMANCE LAB MANAGED REQUEST</Text>
+                </View>
+
                 <Text style={styles.description}>
-                    Thanks! We’re checking availability with the artist.
+                    Excellent choice. Our agents are now coordinating availability and custom logistics with the artist.
                     {isLoggedIn
-                        ? " You’ll receive a message and a quote in your dashboard soon."
-                        : " Track your request by creating an account. We’ll notify you as soon as the artist responds."}
+                        ? " You’ll receive a personalized quote in your dashboard soon."
+                        : " Track your request status by creating an account. We’ll notify you as soon as the production plan is ready."}
                 </Text>
 
                 <View style={styles.actions}>
@@ -107,8 +112,26 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '900',
         color: COLORS.text,
-        marginBottom: SPACING.m,
+        marginBottom: 8,
         textAlign: 'center',
+    },
+    agencyBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#121212',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 4,
+        marginBottom: SPACING.xl,
+        borderWidth: 1,
+        borderColor: 'rgba(204, 255, 0, 0.2)',
+    },
+    agencyBadgeText: {
+        color: COLORS.primary,
+        fontSize: 12,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     },
     description: {
         fontSize: 18,
