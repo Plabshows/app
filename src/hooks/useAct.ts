@@ -30,6 +30,8 @@ export interface ActDetailData {
     location_base: string;
     experience_years: number;
     image_url: string;
+    avatar_url: string;
+    banner_url?: string;
     video_url: string;
     photos_url: string[];
     videos_url: string[];
@@ -39,12 +41,31 @@ export interface ActDetailData {
     is_verified: boolean;
     is_pro: boolean;
     artistName: string;
-    avatar_url: string;
-    banner_url?: string;
     location: string;
+    owner_id?: string;
+    category_id?: string;
+    price_guide?: string;
     profile?: ActProfile;
     reviews?: Review[];
+    role?: string;
 }
+
+// Static category map — avoids PostgREST PGRST200 join errors
+const CATEGORY_MAP: Record<string, string> = {
+    '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musician',
+    'bf451e54-4edb-4453-8ff7-f74a3882e89c': 'Dancer',
+    'f26b86db-2ef5-476b-bf53-3a09d4ecba17': 'Magic',
+    '42f050db-aa72-4a8f-97ba-8521b4c1ec03': 'Roaming',
+    '95585a4e-1cc1-417e-a064-7f210b9c2996': 'Fire & Flow',
+    '6e2eba1a-54ee-4360-95b1-932089633089': 'Circus',
+    'bff4df18-b95f-4f7e-821b-ab303b030c9a': 'DJ',
+    '7dc05cb1-fa8a-4317-9c17-d2682831d73c': 'Specialty Act',
+    'd2a26c3d-cae5-44be-b93d-69dff6d8413b': 'Presenter',
+    '0213d374-c4f2-48b7-bfe8-da15cfd79ed9': 'Comedian',
+    '0ca60f4f-2c8b-421c-9711-88f1e9327cb8': 'Singer',
+    '3f2c5fde-a1b9-4e10-a653-8f851a34b678': 'Others',
+    '8a662c88-7702-4ec7-bd70-671d707a0774': 'Art',
+};
 
 export function useAct(id: string | string[]) {
     const [act, setAct] = useState<ActDetailData | null>(null);
@@ -58,58 +79,38 @@ export function useAct(id: string | string[]) {
         }
     }, [id]);
 
-    async function fetchAct(actId: string) {
+    async function fetchAct(profileId: string) {
         try {
             setLoading(true);
             setError(null);
 
-            // Step 1: Fetch the act with its category
-            const { data: actData, error: actError } = await supabase
-                .from('acts')
-                .select(`
-                    *,
-                    category_data:categories(name)
-                `)
-                .eq('id', actId)
+            // Simple select — no JOIN (avoids PGRST200 schema cache error)
+            const { data: prof, error: profError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', profileId)
                 .single();
 
-            if (actError) {
-                console.error('[useAct] Supabase act fetch error:', actError);
-                throw actError;
+            if (profError) {
+                console.error('[useAct] Profile fetch error:', profError);
+                throw profError;
             }
 
-            if (!actData) {
-                setError(new Error('No data returned for act ID: ' + actId));
+            if (!prof) {
+                setError(new Error('No profile data returned for ID: ' + profileId));
                 return;
             }
 
-            // Step 2: Fetch the owner's profile separately (avoids FK join issues)
-            let ownerProfile: ActProfile | null = null;
-            if (actData.owner_id) {
-                const { data: profileData, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('name, avatar_url, banner_url, managed_by_admin')
-                    .eq('id', actData.owner_id)
-                    .single();
-
-                if (profileError) {
-                    console.warn('[useAct] Could not fetch owner profile:', profileError.message);
-                } else {
-                    ownerProfile = profileData;
-                }
-            }
-
-            // Step 3: Fetch reviews separately
+            // Fetch reviews (still linked to the profileId which behaves as act_id)
             let reviews: Review[] = [];
             try {
                 const { data: reviewData } = await supabase
                     .from('reviews')
                     .select('id, rating, comment, created_at, reviewer_id')
-                    .eq('act_id', actId)
+                    .eq('act_id', profileId)
                     .order('created_at', { ascending: false });
 
                 if (reviewData && reviewData.length > 0) {
-                    // Fetch reviewer profiles
                     const reviewerIds = reviewData.map(r => r.reviewer_id).filter(Boolean);
                     const { data: reviewerProfiles } = await supabase
                         .from('profiles')
@@ -124,31 +125,58 @@ export function useAct(id: string | string[]) {
                     }));
                 }
             } catch (revErr) {
-                console.warn('[useAct] Reviews fetch skipped:', revErr);
+                console.warn('[useAct] Reviews fetch error:', revErr);
             }
 
-            // Step 4: Map all data for the UI
+            // Map Unified Profile to ActDetailData structure
             const mappedData: ActDetailData = {
-                ...actData,
-                category: (actData.category_data as any)?.name || actData.category || 'Artist',
-                artistName: ownerProfile?.name || actData.name || 'Artist',
-                avatar_url: ownerProfile?.avatar_url || '',
-                banner_url: ownerProfile?.banner_url || '',
-                location: actData.location_base || 'International',
-                profile: ownerProfile || undefined,
+                id: prof.id,
+                name: prof.name || 'Artist',
+                artistName: prof.name || 'Artist',
+                title: prof.name || 'Artist',
+                description: prof.description || prof.bio || '',
+                category: CATEGORY_MAP[prof.category_id] || 'Artist',
+                genre: prof.genre || '',
+                artist_type: prof.artist_type || '',
+                location_base: prof.city || '',
+                experience_years: prof.experience_years || 0,
+                // In Unified mode: avatar_url IS the main profile image used in act display
+                image_url: prof.avatar_url || '',
+                avatar_url: prof.avatar_url || '',
+                banner_url: prof.banner_url || '',
+                video_url: prof.video_url || '',
+                photos_url: prof.gallery_urls || prof.photos_url || [],
+                videos_url: prof.videos_url || [],
+                packages: prof.packages || [],
+                technical_specs: prof.technical_specs || '',
+                technical_rider_url: prof.technical_rider_url || '',
+                is_verified: prof.is_verified || false,
+                is_pro: prof.is_pro || false,
+                location: prof.city ? `${prof.city}, ${prof.country || ''}` : 'International',
+                owner_id: prof.id, // For unified profiles, the owner is self or managed
+                category_id: prof.category_id,
+                price_guide: prof.price_guide,
+                role: prof.role,
                 reviews,
-                packages: actData.packages || [],
             };
 
-            console.log('[useAct] Loaded act:', mappedData.id, '→', mappedData.artistName);
+            console.log('[useAct] Loaded Unified Profile:', mappedData.id, '→', mappedData.artistName);
             setAct(mappedData);
         } catch (e: any) {
-            console.error('[useAct] Error fetching act:', e);
+            console.error('[useAct] Error fetching unified act:', e);
             setError(e);
         } finally {
             setLoading(false);
         }
     }
 
-    return { act, loading, error, refetch: fetchAct };
+    return {
+        act,
+        loading,
+        error,
+        refetch: () => {
+            const actId = Array.isArray(id) ? id[0] : id;
+            if (actId) fetchAct(actId);
+        }
+    };
 }

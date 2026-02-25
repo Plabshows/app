@@ -90,15 +90,17 @@ export default function DiscoverScreen() {
     const fetchNewArtists = async () => {
       try {
         const { data, error } = await supabase
-          .from('acts')
-          .select('*, category:categories(name, slug)')
+          .from('profiles')
+          .select('*, category_data:categories(name, slug)')
+          .or('role.eq.artist,role.eq.talent')
+          .eq('is_published', true)
           .order('created_at', { ascending: false })
           .limit(10);
 
         if (data && data.length > 0) {
-          const mapped = data.map((act: any) => ({
-            ...act,
-            category: act.category?.name || 'Uncategorized',
+          const mapped = data.map((prof: any) => ({
+            ...prof,
+            category: prof.category_data?.name || 'Artist',
           }));
           setNewActs(mapped);
         }
@@ -119,17 +121,8 @@ export default function DiscoverScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, activeCategory]);
 
-  // Filter acts for "Featured" - picking a diverse sample from different categories
-  const featuredActs = React.useMemo(() => {
-    if (!acts) return [];
-    const categoriesMap = new Map();
-    acts.forEach(act => {
-      if (!categoriesMap.has(act.category)) {
-        categoriesMap.set(act.category, act);
-      }
-    });
-    return Array.from(categoriesMap.values()).slice(0, 8);
-  }, [acts]);
+  // Featured: show all acts (sorted by most recently added)
+  const featuredActs = React.useMemo(() => acts.slice(0, 20), [acts]);
 
   // Hero act (e.g., the first one with a video)
   const heroAct = acts?.find(a => a.video_url) || acts?.[0];
@@ -248,15 +241,13 @@ export default function DiscoverScreen() {
     );
   };
 
-  // --- IMAGE & DATA HELPERS ---
-  const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
-
-  const getArtistImage = (item: any) => {
-    return (isRealPhoto(item.banner_url) ? item.banner_url : null)
-      || (isRealPhoto(item.avatar_url) ? item.avatar_url : null)
-      || (Array.isArray(item.photos_url) && isRealPhoto(item.photos_url[0]) ? item.photos_url[0] : null)
-      || (item.image_url && isRealPhoto(item.image_url) ? item.image_url : null)
-      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
+  // --- IMAGE HELPER (no filtering — always show best available) ---
+  const getArtistImage = (item: any): string => {
+    return item.avatar_url
+      || item.banner_url
+      || (Array.isArray(item.gallery_urls) && item.gallery_urls[0] ? item.gallery_urls[0] : null)
+      || item.image_url
+      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png';
   };
 
   const renderFeatured = () => (
@@ -308,7 +299,8 @@ export default function DiscoverScreen() {
   );
 
   const renderNewArtists = () => {
-    if (newActs.length === 0) return null;
+    const source = newActs.length > 0 ? newActs : acts;
+    if (source.length === 0) return null;
 
     return (
       <View style={styles.section}>
@@ -322,7 +314,7 @@ export default function DiscoverScreen() {
 
         <FlatList
           horizontal
-          data={newActs}
+          data={newActs.length > 0 ? newActs : acts}
           keyExtractor={item => item.id}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: SPACING.m }}

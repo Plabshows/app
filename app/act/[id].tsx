@@ -1,10 +1,13 @@
 import { COLORS } from '@/src/constants/theme';
+import { useAuth } from '@/src/context/AuthContext';
 import { ActDetailData, useAct } from '@/src/hooks/useAct';
+import { supabase } from '@/src/lib/supabase';
 import { ResizeMode, Video } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Star, Video as VideoIcon } from 'lucide-react-native';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, Star, Video as VideoIcon } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -19,8 +22,212 @@ const TABS = [
 export default function ActDetail() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const { act, loading, error } = useAct(id);
+    const { user, profile } = useAuth();
+    const { act, loading, error, refetch } = useAct(id);
+
+    // Edit Mode State
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [editedData, setEditedData] = useState<any>(null);
+
+    // Permissions check — broad check to catch all superadmin variants
+    const isSuperAdmin =
+        profile?.role === 'admin' ||
+        profile?.role === 'superadmin' ||
+        (profile as any)?.is_admin === true ||
+        user?.app_metadata?.role === 'superadmin' ||
+        user?.app_metadata?.role === 'admin';
+    const isOwner = user?.id === act?.id; // profiles are self-owned (id = user id)
+    const canEdit = isSuperAdmin || isOwner;
+
     const [activeSection, setActiveSection] = useState('biography');
+
+    useEffect(() => {
+        if (act && !editedData) {
+            setEditedData({
+                name: act.name,
+                description: act.description,
+                location: act.location,
+                category: act.category,
+                price_guide: act.price_guide,
+                video_url: act.video_url,
+                artistName: act.artistName,
+                avatar_url: act.avatar_url,
+                banner_url: act.banner_url
+            });
+        }
+    }, [act]);
+
+    const handleSave = async () => {
+        if (!act || !editedData) return;
+        try {
+            setIsSaving(true);
+
+            // GOD-MODE API CALL
+            const response = await fetch('/api/admin/update-act', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId: act.id,
+                    profileData: {
+                        name: editedData.artistName,
+                        description: editedData.description,
+                        city: editedData.location,
+                        category_id: act.category_id,
+                        genre: editedData.genre,
+                        artist_type: editedData.artist_type,
+                        price_guide: editedData.price_guide,
+                        video_url: editedData.video_url,
+                        avatar_url: editedData.avatar_url,
+                        banner_url: editedData.banner_url
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update profile via API.');
+            }
+
+            Alert.alert('Success', '¡Perfil actualizado correctamente!');
+            setIsEditing(false);
+            setEditedData(null); // reset so it re-initializes from fresh data
+            refetch(); // Refresh data
+            if (Platform.OS === 'web') {
+                // On web, force a full refresh to reflect saved changes
+                (window as any).location.reload();
+            }
+        } catch (error: any) {
+            console.error('Error saving profile:', error);
+            Alert.alert('Error', error.message || 'Could not save changes.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const pickImage = async (field: 'avatar_url' | 'banner_url') => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: field === 'avatar_url' ? [1, 1] : [16, 9],
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets[0].uri) {
+                await uploadImage(result.assets[0].uri, field);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Could not open image library.');
+        }
+    };
+
+    const uploadImage = async (uri: string, field: 'avatar_url' | 'banner_url') => {
+        try {
+            setIsSaving(true);
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const fileExt = uri.split('.').pop();
+            const fileName = `${act?.owner_id}/${field}-${Date.now()}.${fileExt}`;
+            const filePath = `avatars/${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('media')
+                .upload(filePath, blob, {
+                    contentType: `image/${fileExt}`,
+                    upsert: true
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('media')
+                .getPublicUrl(filePath);
+
+            setEditedData((prev: any) => ({ ...prev, [field]: publicUrl }));
+
+            // NOTE: Auto-save removed as per God-mode requirements. 
+            // The image URL will be saved permanently when the user clicks 'Save Changes'.
+            Alert.alert('Image Uploaded', 'New photo uploaded successfully. Remember to click Save Changes to make it permanent.');
+
+        } catch (error: any) {
+            console.error('Error uploading image:', error);
+            Alert.alert('Upload Failed', error.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleAddPhoto = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setIsSaving(true);
+                const currentPhotos = [...(act?.photos_url || [])];
+                const uploadCount = result.assets.length;
+                console.log(`[Gallery] Starting upload of ${uploadCount} photos...`);
+
+                const uploadedUrls: string[] = [];
+
+                for (const asset of result.assets) {
+                    const uri = asset.uri;
+                    const response = await fetch(uri);
+                    const blob = await response.blob();
+                    const fileExt = uri.split('.').pop() || 'jpg';
+                    const fileName = `${act?.id}/gallery-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const filePath = `avatars/${fileName}`;
+
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('media')
+                        .upload(filePath, blob, {
+                            contentType: `image/${fileExt}`,
+                            upsert: true
+                        });
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('media')
+                        .getPublicUrl(filePath);
+
+                    uploadedUrls.push(publicUrl);
+                }
+
+                // Update database: Merge new and old photos
+                const finalPhotos = [...currentPhotos, ...uploadedUrls];
+
+                const apiResponse = await fetch('/api/admin/update-act', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profileId: act?.id,
+                        profileData: {
+                            gallery_urls: finalPhotos
+                        }
+                    })
+                });
+
+                if (!apiResponse.ok) {
+                    const errorData = await apiResponse.json();
+                    throw new Error(errorData.error || 'Failed to update gallery via API.');
+                }
+
+                Alert.alert('Success', `${uploadCount} photos added to gallery.`);
+                refetch();
+            }
+        } catch (error: any) {
+            console.error('Error adding photos:', error);
+            Alert.alert('Error', error.message || 'Could not upload photos.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // Refs for scroll-to-section
     const scrollViewRef = useRef<ScrollView>(null);
@@ -133,8 +340,11 @@ export default function ActDetail() {
     const renderHeader = () => (
         <View style={styles.header}>
             {/* ... cover image block ... */}
-            <View style={styles.coverImageContainer}>
-                {displayAct.video_url && !mainYtId ? (
+            <Pressable
+                onPress={() => isEditing && pickImage('banner_url')}
+                style={styles.coverImageContainer}
+            >
+                {displayAct.video_url && !mainYtId && !isEditing ? (
                     <Video
                         source={{ uri: displayAct.video_url }}
                         style={styles.coverImage}
@@ -145,11 +355,17 @@ export default function ActDetail() {
                     />
                 ) : (
                     <Image
-                        source={{ uri: coverImageUrl }}
+                        source={{ uri: isEditing ? editedData?.banner_url : coverImageUrl }}
                         style={styles.coverImage}
                     />
                 )}
                 <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+
+                {isEditing && (
+                    <View style={styles.imageEditOverlay}>
+                        <Text style={styles.imageEditLabel}>Change Cover Image</Text>
+                    </View>
+                )}
 
                 {/* Back Button */}
                 <Pressable
@@ -158,32 +374,71 @@ export default function ActDetail() {
                 >
                     <ArrowLeft color="#fff" size={24} />
                 </Pressable>
-            </View>
+
+                {/* Admin/Owner Toggle */}
+                {canEdit && (
+                    <Pressable
+                        style={styles.editToggleAbsolute}
+                        onPress={() => setIsEditing(!isEditing)}
+                    >
+                        <Text style={styles.editToggleText}>
+                            {isEditing ? '👀 View Profile' : '✏️ Activar Modo Edición'}
+                        </Text>
+                    </Pressable>
+                )}
+            </Pressable>
 
             {/* Profile Info Overlay */}
             <View style={styles.headerContent}>
-                <View style={styles.avatarContainer}>
+                <Pressable
+                    onPress={() => isEditing && pickImage('avatar_url')}
+                    style={styles.avatarContainer}
+                >
                     <Image
-                        source={{ uri: avatarUrl }}
+                        source={{ uri: isEditing ? editedData?.avatar_url : avatarUrl }}
                         style={styles.avatar}
                     />
-                    {displayAct.is_verified && (
+                    {isEditing && (
+                        <View style={styles.imageEditOverlay}>
+                            <Text style={styles.imageEditLabel}>Change</Text>
+                        </View>
+                    )}
+                    {!isEditing && displayAct.is_verified && (
                         <View style={styles.verifiedBadge}>
                             <CheckCircle2 color={COLORS.background} size={14} />
                         </View>
                     )}
-                </View>
+                </Pressable>
 
                 <View style={styles.headerInfo}>
-                    <View style={styles.nameRow}>
-                        <Text style={styles.artistNameHeader}>{displayAct.artistName}</Text>
-                    </View>
-                    <View style={styles.taglineRow}>
-                        <Text style={styles.categoryTag}>{displayAct.category}</Text>
-                        <View style={styles.dot} />
-                        <MapPin color={COLORS.primary} size={12} style={{ marginRight: 4 }} />
-                        <Text style={styles.locationTag}>{displayAct.location}</Text>
-                    </View>
+                    {isEditing ? (
+                        <>
+                            <TextInput
+                                style={styles.editInput}
+                                value={editedData?.artistName}
+                                onChangeText={(val) => setEditedData((p: any) => ({ ...p, artistName: val }))}
+                                placeholder="Artist Name"
+                            />
+                            <TextInput
+                                style={[styles.editInput, { marginTop: 8 }]}
+                                value={editedData?.category}
+                                onChangeText={(val) => setEditedData((p: any) => ({ ...p, category: val }))}
+                                placeholder="Show Category"
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <View style={styles.nameRow}>
+                                <Text style={styles.artistNameHeader}>{displayAct.artistName}</Text>
+                            </View>
+                            <View style={styles.taglineRow}>
+                                <Text style={styles.categoryTag}>{displayAct.category}</Text>
+                                <View style={styles.dot} />
+                                <MapPin color={COLORS.primary} size={12} style={{ marginRight: 4 }} />
+                                <Text style={styles.locationTag}>{displayAct.location}</Text>
+                            </View>
+                        </>
+                    )}
                 </View>
 
                 <View style={styles.ctaRow}>
@@ -220,20 +475,61 @@ export default function ActDetail() {
     const renderBiography = () => (
         <View style={styles.tabContent}>
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About {displayAct.artistName}</Text>
-                <Text style={styles.bioText}>
-                    {displayAct.description || "This artist hasn't provided a biography yet."}
-                </Text>
+                <Text style={styles.sectionTitle}>About {isEditing ? editedData?.artistName : displayAct.artistName}</Text>
+                {isEditing ? (
+                    <TextInput
+                        style={[styles.editInput, { minHeight: 120, textAlignVertical: 'top' }]}
+                        value={editedData?.description}
+                        onChangeText={(val) => setEditedData((p: any) => ({ ...p, description: val }))}
+                        multiline
+                        placeholder="Describe the artist and their show..."
+                    />
+                ) : (
+                    <Text style={styles.bioText}>
+                        {displayAct.description || "This artist hasn't provided a biography yet."}
+                    </Text>
+                )}
             </View>
 
             {/* Talent Card */}
-            <View style={styles.talentCard}>
-                <Text style={styles.talentCardTitle}>Talent Details</Text>
-                <View style={styles.detailsGrid}>
-                    <DetailItem label="Art Type" value={displayAct.category} />
-                    <DetailItem label="Specialty" value={displayAct.genre || displayAct.artist_type || 'Performer'} />
-                    <DetailItem label="Experience" value={`${displayAct.experience_years || 5}+ Years`} />
-                    <DetailItem label="Base" value={displayAct.location_base || displayAct.location || 'Dubai, UAE'} />
+            <View style={styles.section}>
+                <View style={styles.talentCard}>
+                    <Text style={styles.talentCardTitle}>Talent Details</Text>
+                    {isEditing ? (
+                        <View style={styles.detailsGrid}>
+                            <View style={{ width: '48%' }}>
+                                <Text style={styles.editLabel}>Base Location</Text>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editedData?.location}
+                                    onChangeText={(val) => setEditedData((p: any) => ({ ...p, location: val }))}
+                                />
+                            </View>
+                            <View style={{ width: '48%' }}>
+                                <Text style={styles.editLabel}>Price Guide</Text>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editedData?.price_guide}
+                                    onChangeText={(val) => setEditedData((p: any) => ({ ...p, price_guide: val }))}
+                                />
+                            </View>
+                            <View style={{ width: '100%' }}>
+                                <Text style={styles.editLabel}>Video URL (YouTube/Vimeo)</Text>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={editedData?.video_url}
+                                    onChangeText={(val) => setEditedData((p: any) => ({ ...p, video_url: val }))}
+                                />
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.detailsGrid}>
+                            <DetailItem label="Art Type" value={displayAct.category} />
+                            <DetailItem label="Specialty" value={displayAct.genre || displayAct.artist_type || 'Performer'} />
+                            <DetailItem label="Experience" value={`${displayAct.experience_years || 5}+ Years`} />
+                            <DetailItem label="Base" value={displayAct.location_base || displayAct.location || 'Dubai, UAE'} />
+                        </View>
+                    )}
                 </View>
             </View>
         </View>
@@ -298,10 +594,16 @@ export default function ActDetail() {
                 )}
 
                 {/* --- PHOTOS SECTION --- */}
-                {photos.length > 0 && (
+                {(photos.length > 0 || isEditing) && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>📸 Photos</Text>
                         <View style={styles.mediaGrid}>
+                            {isEditing && (
+                                <Pressable style={styles.addMediaItem} onPress={handleAddPhoto}>
+                                    <Plus color={COLORS.primary} size={32} />
+                                    <Text style={styles.addMediaText}>Add Photos</Text>
+                                </Pressable>
+                            )}
                             {photos.map((photo, i) => (
                                 <View key={`photo-${i}`} style={styles.mediaItem}>
                                     <Image source={{ uri: photo }} style={styles.mediaImage} />
@@ -513,6 +815,24 @@ export default function ActDetail() {
                     <View style={{ height: 100 }} />
                 </View>
             </ScrollView>
+
+            {/* Save Button Floating */}
+            {isEditing && (
+                <Pressable
+                    style={[styles.saveButtonAbsolute, isSaving && { opacity: 0.7 }]}
+                    onPress={handleSave}
+                    disabled={isSaving}
+                >
+                    {isSaving ? (
+                        <ActivityIndicator color="#000" size="small" />
+                    ) : (
+                        <>
+                            <Save size={20} color="#000" />
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                        </>
+                    )}
+                </Pressable>
+            )}
         </View>
     );
 }
@@ -1065,5 +1385,101 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 2,
         borderColor: 'rgba(255,255,255,0.3)',
+    },
+    editToggleAbsolute: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+        zIndex: 1000,
+    },
+    editToggleText: {
+        color: COLORS.primary,
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    saveButtonAbsolute: {
+        position: 'absolute',
+        bottom: 30,
+        right: 20,
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 30,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        zIndex: 10000,
+    },
+    saveButtonText: {
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 16,
+    },
+    editInput: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        color: '#FFF',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+        marginTop: 5,
+    },
+    editLabel: {
+        color: COLORS.primary,
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        marginTop: 10,
+    },
+    bannerWrapper: {
+        width: '100%',
+        height: 250,
+    },
+    avatarWrapper: {
+        position: 'absolute',
+        bottom: -50,
+        left: 20,
+        zIndex: 10,
+    },
+    imageEditOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 1000, // For avatar, we'll need to handle banner separately if needed
+    },
+    imageEditLabel: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    addMediaItem: {
+        width: (width - 50) / 2,
+        height: 200,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,184,0,0.05)',
+    },
+    addMediaText: {
+        color: COLORS.primary,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginTop: 10,
     },
 });
