@@ -38,11 +38,11 @@ export default function SearchScreen() {
 
   const renderItem = ({ item }: { item: Act }) => {
     const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
-    const displayImage = (isRealPhoto(item.banner_url) ? item.banner_url : null)
-      || (isRealPhoto(item.avatar_url) ? item.avatar_url : null)
-      || (Array.isArray(item.photos_url) && isRealPhoto(item.photos_url[0]) ? item.photos_url[0] : null)
+    const displayImage = (isRealPhoto(item.avatar_url) ? item.avatar_url : null)
+      || (isRealPhoto(item.banner_url) ? item.banner_url : null)
+      || (Array.isArray(item.gallery_urls) && isRealPhoto(item.gallery_urls[0]) ? item.gallery_urls[0] : null)
       || (item.image_url && isRealPhoto(item.image_url) ? item.image_url : null)
-      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
+      || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png';
 
     return (
       <Pressable
