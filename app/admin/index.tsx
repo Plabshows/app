@@ -233,6 +233,7 @@ export default function AdminDashboard() {
                     owner_name: p.name || p.email || 'Admin/Directo',
                     has_act: !!actData,
                     is_published: p.is_published,
+                    is_public: p.is_public,
                     role: p.role,
                     created_at: p.created_at
                 });
@@ -250,6 +251,7 @@ export default function AdminDashboard() {
                         owner_name: 'Manual Upload',
                         has_act: true,
                         is_published: false,
+                        is_public: false,
                         role: 'artist',
                         created_at: act.created_at
                     });
@@ -471,9 +473,9 @@ export default function AdminDashboard() {
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardCategory}>{item.category} • {item.owner_name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <View style={[styles.dot, { backgroundColor: item.has_act ? (item.is_published ? '#4CAF50' : COLORS.primary) : '#F44336' }]} />
+                    <View style={[styles.dot, { backgroundColor: item.has_act ? (item.is_published ? (item.is_public ? '#4CAF50' : '#FF9800') : COLORS.primary) : '#F44336' }]} />
                     <Text style={styles.cardDate}>
-                        {item.has_act ? (item.is_published ? 'Publicado' : 'Borrador') : 'Sin Perfil Act'}
+                        {item.has_act ? (item.is_published ? (item.is_public ? 'Online (Público)' : 'Oculto (Borrador Interno)') : 'Pendiente Aprobación') : 'Sin Perfil Act'}
                     </Text>
                 </View>
             </View>

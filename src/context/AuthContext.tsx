@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [impersonatedAct, setImpersonatedAct] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const fetchProfileData = async (userId: string) => {
+    const fetchProfileData = async (userId: string, currentSession?: Session | null) => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -50,11 +50,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 .single();
 
             if (error) {
-                console.error('Error fetching profile:', error);
-                setProfile({
-                    id: userId,
-                    role: 'user'
-                });
+                // If it's a PGRST116 error (row not found), it might be a new OAuth user
+                if (error.code === 'PGRST116' && currentSession?.user) {
+                    console.log('[AuthContext] No profile found. Auto-creating profile for new OAuth user.');
+
+                    const email = currentSession.user.email || '';
+                    const metadata = currentSession.user.user_metadata || {};
+                    // OAuth providers usually provide full_name or name
+                    const name = metadata.full_name || metadata.name || email.split('@')[0] || 'Unknown';
+
+                    const newProfile = {
+                        id: userId,
+                        name: name,
+                        email: email,
+                        role: 'artist', // Default role 
+                    };
+
+                    const { error: upsertError } = await supabase
+                        .from('profiles')
+                        .upsert(newProfile);
+
+                    if (!upsertError) {
+                        setProfile(newProfile);
+                    } else {
+                        console.error('Error auto-creating profile:', upsertError);
+                        setProfile({ id: userId, role: 'user' });
+                    }
+                } else {
+                    console.error('Error fetching profile:', error);
+                    setProfile({ id: userId, role: 'user' });
+                }
             } else {
                 setProfile(data);
 
@@ -117,7 +142,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(currentSession?.user ?? null);
 
             if (currentSession?.user) {
-                await fetchProfileData(currentSession.user.id);
+                await fetchProfileData(currentSession.user.id, currentSession);
             } else if (mounted) {
                 setProfile(null);
                 setArtistAct(null);
@@ -157,7 +182,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         if (currentSession?.user) {
-            await fetchProfileData(currentSession.user.id);
+            await fetchProfileData(currentSession.user.id, currentSession);
         } else {
             setLoading(false);
         }

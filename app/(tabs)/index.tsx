@@ -13,6 +13,7 @@ import {
   Mic,
   Monitor,
   Music,
+  Palette,
   Search,
   ShieldCheck,
   Sparkles,
@@ -50,10 +51,11 @@ const TOP_CATEGORIES = [
   { id: 'fire_flow', name: 'Fire & Flow', icon: Flame },
   { id: 'presenter', name: 'Presenter', icon: Mic },
   { id: 'comedian', name: 'Comedian', icon: Mic },
+  { id: 'art', name: 'Art', icon: Palette },
 ];
 
 const BOTTOM_CATEGORIES = [
-  'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian'
+  'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian', 'Art'
 ];
 
 const CATEGORY_ICONS = {
@@ -66,6 +68,7 @@ const CATEGORY_ICONS = {
   'Fire & Flow': Flame,
   'Presenter': Mic,
   'Comedian': Mic,
+  'Art': Palette,
   'Roaming': Users,
 
   // Legacy mappings for safety
@@ -94,16 +97,17 @@ export default function DiscoverScreen() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*, category_data:categories(name, slug)')
+          .select('*')
           .or('role.eq.artist,role.eq.talent')
           .eq('is_published', true)
+          .eq('is_public', true)
           .order('created_at', { ascending: false })
           .limit(10);
 
         if (data && data.length > 0) {
           const mapped = data.map((prof: any) => ({
             ...prof,
-            category: prof.category_data?.name || 'Artist',
+            category: prof.category || 'Artist',
           }));
           setNewActs(mapped);
         }

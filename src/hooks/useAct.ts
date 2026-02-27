@@ -40,6 +40,7 @@ export interface ActDetailData {
     technical_rider_url: string;
     is_verified: boolean;
     is_pro: boolean;
+    is_public?: boolean;
     artistName: string;
     location: string;
     owner_id?: string;
@@ -152,6 +153,7 @@ export function useAct(id: string | string[]) {
                 technical_rider_url: prof.technical_rider_url || '',
                 is_verified: prof.is_verified || false,
                 is_pro: prof.is_pro || false,
+                is_public: prof.is_public ?? false,
                 location: prof.city ? `${prof.city}, ${prof.country || ''}` : 'International',
                 owner_id: prof.id, // For unified profiles, the owner is self or managed
                 category_id: prof.category_id,

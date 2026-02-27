@@ -53,7 +53,8 @@ export default function ActDetail() {
                 video_url: act.video_url,
                 artistName: act.artistName,
                 avatar_url: act.avatar_url,
-                banner_url: act.banner_url
+                banner_url: act.banner_url,
+                is_public: act.is_public ?? false
             });
         }
     }, [act]);
@@ -63,43 +64,41 @@ export default function ActDetail() {
         try {
             setIsSaving(true);
 
-            // GOD-MODE API CALL
-            const response = await fetch('/api/admin/update-act', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    profileId: act.id,
-                    profileData: {
-                        name: editedData.artistName,
-                        description: editedData.description,
-                        city: editedData.location,
-                        category_id: act.category_id,
-                        genre: editedData.genre,
-                        artist_type: editedData.artist_type,
-                        price_guide: editedData.price_guide,
-                        video_url: editedData.video_url,
-                        avatar_url: editedData.avatar_url,
-                        banner_url: editedData.banner_url
-                    }
-                })
-            });
+            // Enforce explicit profile ID assignment to NOT rely on session
+            const profileId = act.id;
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update profile via API.');
+            // Update Profile directly instead of using a missing API endpoint
+            const profileUpdate = supabase.from('profiles').update({
+                name: editedData.artistName,
+                description: editedData.description,
+                city: editedData.location,
+                category_id: act.category_id,
+                genre: editedData.genre,
+                artist_type: editedData.artist_type,
+                price_guide: editedData.price_guide,
+                video_url: editedData.video_url,
+                avatar_url: editedData.avatar_url,
+                banner_url: editedData.banner_url,
+                is_public: editedData.is_public
+            }).eq('id', profileId); // strict check on specific profile
+
+            const { error: updateError } = await profileUpdate;
+
+            if (updateError) {
+                throw new Error(updateError.message || 'Failed to update profile.');
             }
 
-            Alert.alert('Success', '¡Perfil actualizado correctamente!');
+            Alert.alert('Success ✅', '¡Perfil actualizado correctamente!');
             setIsEditing(false);
             setEditedData(null); // reset so it re-initializes from fresh data
-            refetch(); // Refresh data
+            await refetch(); // Force UI refresh and Cache cleanup
             if (Platform.OS === 'web') {
                 // On web, force a full refresh to reflect saved changes
                 (window as any).location.reload();
             }
         } catch (error: any) {
             console.error('Error saving profile:', error);
-            Alert.alert('Error', error.message || 'Could not save changes.');
+            Alert.alert('Error ❌', error.message || 'Could not save changes.');
         } finally {
             setIsSaving(false);
         }
@@ -202,20 +201,12 @@ export default function ActDetail() {
                 // Update database: Merge new and old photos
                 const finalPhotos = [...currentPhotos, ...uploadedUrls];
 
-                const apiResponse = await fetch('/api/admin/update-act', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        profileId: act?.id,
-                        profileData: {
-                            gallery_urls: finalPhotos
-                        }
-                    })
-                });
+                const { error: apiError } = await supabase.from('profiles').update({
+                    gallery_urls: finalPhotos
+                }).eq('id', act?.id);
 
-                if (!apiResponse.ok) {
-                    const errorData = await apiResponse.json();
-                    throw new Error(errorData.error || 'Failed to update gallery via API.');
+                if (apiError) {
+                    throw new Error(apiError.message || 'Failed to update gallery.');
                 }
 
                 Alert.alert('Success', `${uploadCount} photos added to gallery.`);
@@ -539,6 +530,27 @@ export default function ActDetail() {
                                     onChangeText={(val) => setEditedData((p: any) => ({ ...p, video_url: val }))}
                                 />
                             </View>
+                            <View style={{ width: '100%', marginTop: 12 }}>
+                                <Text style={styles.editLabel}>Profile Visibility</Text>
+                                <Text style={{ color: COLORS.textDim, fontSize: 13, marginBottom: 8 }}>Show this profile publicly in search and galleries?</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Pressable
+                                        style={[
+                                            { width: 44, height: 24, borderRadius: 12, padding: 2, justifyContent: 'center' },
+                                            editedData?.is_public ? { backgroundColor: COLORS.primary } : { backgroundColor: '#333' }
+                                        ]}
+                                        onPress={() => setEditedData((p: any) => ({ ...p, is_public: !p.is_public }))}
+                                    >
+                                        <View style={[
+                                            { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.background },
+                                            editedData?.is_public ? { transform: [{ translateX: 20 }] } : { transform: [{ translateX: 0 }] }
+                                        ]} />
+                                    </Pressable>
+                                    <Text style={[{ marginLeft: 12, fontWeight: 'bold' }, editedData?.is_public ? { color: COLORS.primary } : { color: COLORS.textDim }]}>
+                                        {editedData?.is_public ? 'Mostrar perfil online' : 'Ocultar perfil'}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     ) : (
                         <View style={styles.detailsGrid}>
@@ -711,9 +723,12 @@ export default function ActDetail() {
                 ) : (
                     <View style={styles.emptyBox}>
                         <Info size={40} color={COLORS.textDim} style={{ marginBottom: 12 }} />
-                        <Text style={styles.emptyText}>Contact the artist directly for custom booking options.</Text>
-                        <Pressable style={styles.inquireBtn}>
-                            <Text style={styles.inquireBtnText}>Inquire for Quote</Text>
+                        <Text style={styles.emptyText}>Contact us to book this artist.</Text>
+                        <Pressable
+                            style={styles.inquireBtn}
+                            onPress={() => router.push('/messages' as any)}
+                        >
+                            <Text style={styles.inquireBtnText}>Message Agency</Text>
                         </Pressable>
                     </View>
                 )}

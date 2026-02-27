@@ -35,6 +35,7 @@ export default function UnifiedEditProfile() {
         email: '',
         city: '',
         country: '',
+        is_public: false,
 
         // From 'acts' table
         act_name: '',
@@ -80,6 +81,7 @@ export default function UnifiedEditProfile() {
                 email: user.email || '',
                 city: prof?.city || '',
                 country: prof?.country || '',
+                is_public: prof?.is_public || false,
                 act_name: act?.name || '',
                 category_id: act?.category_id || '',
                 artist_type: act?.artist_type || '',
@@ -208,6 +210,7 @@ export default function UnifiedEditProfile() {
                     name: profileData.full_name,
                     city: profileData.city,
                     country: profileData.country,
+                    is_public: profileData.is_public,
                     // 🎯 Avatar = cover image (first photo or existing)
                     avatar_url: coverImageUrl
                 })
@@ -306,6 +309,30 @@ export default function UnifiedEditProfile() {
                                 placeholder="UAE"
                                 placeholderTextColor={COLORS.textDim}
                             />
+                        </View>
+                    </View>
+
+                    <View style={styles.field}>
+                        <View style={{ flex: 1, marginBottom: 8 }}>
+                            <Text style={styles.label}>Profile Visibility</Text>
+                            <Text style={{ color: COLORS.textDim, fontSize: 13 }}>Show your profile publicly in search and galleries?</Text>
+                        </View>
+                        <View style={styles.row}>
+                            <Pressable
+                                style={[
+                                    { width: 44, height: 24, borderRadius: 12, padding: 2, justifyContent: 'center' },
+                                    profileData.is_public ? { backgroundColor: COLORS.primary } : { backgroundColor: '#333' }
+                                ]}
+                                onPress={() => setProfileData({ ...profileData, is_public: !profileData.is_public })}
+                            >
+                                <View style={[
+                                    { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.background },
+                                    profileData.is_public ? { transform: [{ translateX: 20 }] } : { transform: [{ translateX: 0 }] }
+                                ]} />
+                            </Pressable>
+                            <Text style={[{ marginLeft: 12, fontWeight: 'bold' }, profileData.is_public ? { color: COLORS.primary } : { color: COLORS.textDim }]}>
+                                {profileData.is_public ? 'Mostrar perfil online' : 'Ocultar perfil'}
+                            </Text>
                         </View>
                     </View>
                 </View>

@@ -76,6 +76,24 @@ export const PersonalStep = ({ data, updateData, onNext }: StepProps) => (
             </View>
         </View>
 
+        <View style={styles.field}>
+            <View style={{ flex: 1, marginBottom: 8 }}>
+                <Text style={styles.label}>Profile Visibility</Text>
+                <Text style={{ color: COLORS.textDim, fontSize: 12 }}>Show your profile publicly in search and galleries?</Text>
+            </View>
+            <View style={styles.row}>
+                <Pressable
+                    style={[styles.toggle, data.is_public && styles.toggleActive]}
+                    onPress={() => updateData({ is_public: !data.is_public })}
+                >
+                    <View style={[styles.toggleCircle, data.is_public && styles.toggleCircleActive]} />
+                </Pressable>
+                <Text style={[{ marginLeft: 12, fontWeight: 'bold' }, data.is_public ? { color: COLORS.primary } : { color: COLORS.textDim }]}>
+                    {data.is_public ? 'Mostrar perfil online' : 'Ocultar perfil'}
+                </Text>
+            </View>
+        </View>
+
         <Pressable style={styles.nextButton} onPress={onNext}>
             <Text style={styles.nextButtonText}>Next: Artist Info</Text>
         </Pressable>

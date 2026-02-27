@@ -55,6 +55,7 @@ export default function ArtistProfileWizard() {
         country: '',
         payment_iban: '',
         payment_bank_name: '',
+        is_public: false,
 
         // Act
         act_name: '',
@@ -106,6 +107,7 @@ export default function ArtistProfileWizard() {
                 country: prof?.country || '',
                 payment_iban: prof?.payment_iban || '',
                 payment_bank_name: prof?.payment_bank_name || '',
+                is_public: prof?.is_public || false,
 
                 act_name: act?.name || '',
                 bio: act?.description || '',
@@ -156,6 +158,7 @@ export default function ArtistProfileWizard() {
                 country: formData.country,
                 payment_iban: formData.payment_iban,
                 payment_bank_name: formData.payment_bank_name,
+                is_public: formData.is_public,
             };
             if (firstPhoto) {
                 profileUpdate.avatar_url = firstPhoto;

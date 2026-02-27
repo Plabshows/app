@@ -61,6 +61,31 @@ export default function LoginScreen() {
             setLoading(false);
         }
     };
+    const handleOAuthLogin = async (provider: 'google' | 'apple') => {
+        setErrorMsg('');
+        setLoading(true);
+        try {
+            // Expo router doesn't strictly need makeRedirectUri for web, 
+            // but we use Linking.createURL or simple window.location for web.
+            // On mobile, the bare signInWithOAuth usually opens a browser
+            // and redirects back to the app schema if configured in Supabase.
+            const redirectUrl = Platform.OS === 'web'
+                ? (redirectTo ? `${window.location.origin}${redirectTo}` : window.location.origin)
+                : undefined; // Relying on Supabase's automatic deeper linking configuration for mobile
+
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider,
+                options: {
+                    redirectTo: redirectUrl
+                }
+            });
+
+            if (error) throw error;
+        } catch (error: any) {
+            setErrorMsg(error.message || 'Log in canceled or failed');
+            setLoading(false);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -86,8 +111,13 @@ export default function LoginScreen() {
                         {/* Social Login Buttons */}
                         <View style={styles.socialContainer}>
                             <Pressable
-                                style={[styles.socialButton, styles.googleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+                                style={({ pressed }) => [
+                                    styles.socialButton,
+                                    styles.googleButton,
+                                    pressed && { opacity: 0.8 }
+                                ]}
+                                onPress={() => handleOAuthLogin('google')}
+                                disabled={loading}
                             >
                                 <View style={styles.socialIconPlaceholder}>
                                     <View style={[styles.googleDot, { backgroundColor: '#EA4335' }]} />
@@ -99,8 +129,13 @@ export default function LoginScreen() {
                             </Pressable>
 
                             <Pressable
-                                style={[styles.socialButton, styles.appleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'apple' })}
+                                style={({ pressed }) => [
+                                    styles.socialButton,
+                                    styles.appleButton,
+                                    pressed && { opacity: 0.8 }
+                                ]}
+                                onPress={() => handleOAuthLogin('apple')}
+                                disabled={loading}
                             >
                                 <Mail size={20} color="white" style={styles.socialIcon} />
                                 <Text style={[styles.socialButtonText, { color: 'white' }]}>Continue with Apple</Text>

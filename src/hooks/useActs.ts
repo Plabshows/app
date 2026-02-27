@@ -63,6 +63,7 @@ export function useActs() {
                 .from('profiles')
                 .select('*')
                 .eq('is_published', true)
+                .eq('is_public', true)
                 .or('role.eq.artist,role.eq.talent')
                 .order('created_at', { ascending: false });
 

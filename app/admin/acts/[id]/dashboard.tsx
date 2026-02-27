@@ -45,7 +45,8 @@ export default function AdminManageAct() {
         genre: '',
         bio: '',
         price_guide: '',
-        video_url: ''
+        video_url: '',
+        is_public: false
     });
 
     const [modalVisible, setModalVisible] = useState(false);
@@ -85,7 +86,8 @@ export default function AdminManageAct() {
                 genre: act?.genre || '',
                 bio: act?.description || '',
                 price_guide: act?.price_guide || '',
-                video_url: act?.video_url || ''
+                video_url: act?.video_url || '',
+                is_public: prof?.is_public || false
             });
 
             const photo = Array.isArray(act?.photos_url) ? act.photos_url[0] : act?.photos_url;
@@ -127,12 +129,19 @@ export default function AdminManageAct() {
 
         setSaving(true);
         try {
+            // Strictly enforce the target user ID to prevent relying on the session user
+            const profileId = Array.isArray(targetUserId) ? targetUserId[0] : targetUserId;
+
+            if (!profileId) {
+                throw new Error("Invalid Profile ID.");
+            }
+
             let finalPhotoUrl = existingPhotoUrl;
 
             if (selectedImage) {
                 setIsUploading(true);
                 const fileExt = selectedImage.split('.').pop();
-                const filePath = `${targetUserId}/${Date.now()}_admin_upload.${fileExt}`;
+                const filePath = `${profileId}/${Date.now()}_admin_upload.${fileExt}`;
 
                 const response = await fetch(selectedImage);
                 const blob = await response.blob();
@@ -144,7 +153,7 @@ export default function AdminManageAct() {
                         upsert: true
                     });
 
-                if (uploadError) throw uploadError;
+                if (uploadError) throw new Error(uploadError.message);
 
                 const { data: { publicUrl } } = supabase.storage
                     .from('media')
@@ -154,11 +163,13 @@ export default function AdminManageAct() {
                 setIsUploading(false);
             }
 
-            const { data: currentAct } = await supabase
+            const { data: currentAct, error: actFetchError } = await supabase
                 .from('acts')
                 .select('image_url, photos_url')
-                .eq('owner_id', targetUserId)
+                .eq('owner_id', profileId)
                 .maybeSingle();
+
+            if (actFetchError) throw new Error(actFetchError.message);
 
             const existingPhotos: string[] = Array.isArray(currentAct?.photos_url) ? currentAct.photos_url : [];
             let updatedPhotos = [...existingPhotos];
@@ -168,17 +179,23 @@ export default function AdminManageAct() {
 
             const coverImageUrl = finalPhotoUrl || currentAct?.image_url;
 
-            // 1. Update Profile
-            await supabase.from('profiles').update({
+            // 1. Update Profile (Strict ID check applied here)
+            const { error: profileError } = await supabase.from('profiles').update({
                 name: profileData.full_name,
                 city: profileData.city,
                 country: profileData.country,
+                is_public: profileData.is_public,
                 avatar_url: coverImageUrl
-            }).eq('id', targetUserId);
+            }).eq('id', profileId);
+
+            if (profileError) {
+                console.error("Admin Profile Update Error:", profileError);
+                throw new Error(profileError.message);
+            }
 
             // 2. Upsert Act
-            await supabase.from('acts').upsert({
-                owner_id: targetUserId,
+            const { error: actError } = await supabase.from('acts').upsert({
+                owner_id: profileId,
                 name: profileData.act_name,
                 category_id: profileData.category_id || null,
                 artist_type: profileData.artist_type,
@@ -190,16 +207,28 @@ export default function AdminManageAct() {
                 photos_url: updatedPhotos
             }, { onConflict: 'owner_id' });
 
-            // 3. Audit Log
-            if (currentAdmin) {
-                await logAdminAction(currentAdmin.id, targetUserId as string, 'edit_user', { detail: 'Admin modified profile/act' });
+            if (actError) {
+                console.error("Admin Act Upsert Error:", actError);
+                throw new Error(actError.message);
             }
 
-            Alert.alert('Success', 'Profile updated successfully by Admin.');
+            // 3. Audit Log
+            if (currentAdmin) {
+                await logAdminAction(currentAdmin.id, profileId as string, 'edit_user', { detail: 'Admin modified profile/act' });
+            }
+
+            Alert.alert('Success ✅', 'Profile updated successfully by Admin.');
             setSelectedImage(null);
             setExistingPhotoUrl(finalPhotoUrl);
+
+            // Refetch data to force UI refresh and clear generic cache issues
+            await fetchData();
+            if (Platform.OS === 'web') {
+                (window as any).location.reload();
+            }
         } catch (err: any) {
-            Alert.alert('Error Saving', err.message);
+            console.error('Save error:', err);
+            Alert.alert('Error ❌', err.message || 'Could not save changes.');
         } finally {
             setSaving(false);
             setIsUploading(false);
@@ -267,6 +296,30 @@ export default function AdminManageAct() {
                                 placeholder="UAE"
                                 placeholderTextColor={COLORS.textDim}
                             />
+                        </View>
+                    </View>
+
+                    <View style={styles.field}>
+                        <View style={{ flex: 1, marginBottom: 8 }}>
+                            <Text style={styles.label}>Profile Visibility (Admin Override)</Text>
+                            <Text style={{ color: COLORS.textDim, fontSize: 13 }}>Show this profile publicly in search and galleries?</Text>
+                        </View>
+                        <View style={styles.row}>
+                            <Pressable
+                                style={[
+                                    { width: 44, height: 24, borderRadius: 12, padding: 2, justifyContent: 'center' },
+                                    profileData.is_public ? { backgroundColor: COLORS.primary } : { backgroundColor: '#333' }
+                                ]}
+                                onPress={() => setProfileData({ ...profileData, is_public: !profileData.is_public })}
+                            >
+                                <View style={[
+                                    { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.background },
+                                    profileData.is_public ? { transform: [{ translateX: 20 }] } : { transform: [{ translateX: 0 }] }
+                                ]} />
+                            </Pressable>
+                            <Text style={[{ marginLeft: 12, fontWeight: 'bold' }, profileData.is_public ? { color: COLORS.primary } : { color: COLORS.textDim }]}>
+                                {profileData.is_public ? 'Mostrar perfil online' : 'Ocultar perfil'}
+                            </Text>
                         </View>
                     </View>
                 </View>
