@@ -46,6 +46,8 @@ export interface ActDetailData {
     location: string;
     owner_id?: string;
     category_id?: string;
+    category_ids?: string[];
+    categories?: string[];
     price_guide?: string;
     profile?: ActProfile;
     reviews?: Review[];
@@ -167,9 +169,11 @@ export function useAct(id: string | string[]) {
                 is_verified: prof.is_verified || false,
                 is_pro: prof.is_pro || false,
                 is_published: prof.is_published || false,
-                location: prof.city ? `${prof.city}, ${prof.country || ''}` : 'International',
+                location: prof.city ? [prof.city, prof.country].filter(Boolean).join(', ') : 'International',
                 owner_id: prof.id, 
                 category_id: actData?.category_id || prof.category_id,
+                category_ids: actData?.category_ids || prof.category_ids || [],
+                categories: actData?.categories || prof.categories || [],
                 price_guide: actData?.price_guide || prof.price_guide,
                 role: prof.role,
                 social_links: prof.social_links || { instagram: '', tiktok: '', website: '' },

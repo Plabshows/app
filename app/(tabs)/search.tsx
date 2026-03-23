@@ -32,7 +32,7 @@ export default function SearchScreen() {
     const matchesSearch = (act.name || act.title || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' ||
       act.category === selectedCategory ||
-      (act.category && act.category.includes(selectedCategory));
+      act.categories?.some(c => c === selectedCategory);
     return matchesSearch && matchesCategory;
   });
 
@@ -51,9 +51,13 @@ export default function SearchScreen() {
       >
         <Image source={{ uri: displayImage }} style={styles.cardImage} />
         <View style={styles.cardContent}>
-          <Text style={styles.cardCategory}>{item.category}</Text>
+          <Text style={styles.cardCategory}>
+            {item.categories && item.categories.length > 0 
+              ? item.categories.join(' • ') 
+              : item.category}
+          </Text>
           <Text style={styles.cardTitle}>{item.name || item.title}</Text>
-          <Text style={styles.cardPrice}>{item.price_guide || item.price_range || 'Contact for price'}</Text>
+          <Text style={styles.cardPrice}>{item.price_guide || 'Contact for price'}</Text>
         </View>
       </Pressable>
     );

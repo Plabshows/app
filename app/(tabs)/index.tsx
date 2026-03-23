@@ -312,7 +312,11 @@ export default function DiscoverScreen() {
                   </View>
                 </View>
                 <Text style={styles.featuredTitle} numberOfLines={1}>{(item as any).name || (item as any).title}</Text>
-                <Text style={styles.featuredCategory}>{item.category}</Text>
+                <Text style={styles.featuredCategory}>
+                  {item.categories && item.categories.length > 0 
+                    ? item.categories.join(' • ') 
+                    : item.category}
+                </Text>
                 <Text style={styles.featuredLocation}>{(item as any).location_base || (item as any).location || 'Dubai, UAE'}</Text>
               </View>
             </Pressable>
@@ -357,7 +361,11 @@ export default function DiscoverScreen() {
                   </View>
                 </View>
                 <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.featuredCategory}>{item.category}</Text>
+                <Text style={styles.featuredCategory}>
+                  {item.categories && item.categories.length > 0 
+                    ? item.categories.join(' • ') 
+                    : item.category}
+                </Text>
                 <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
               </View>
             </Pressable>
@@ -417,7 +425,11 @@ export default function DiscoverScreen() {
               />
               <View style={styles.featuredContent}>
                 <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.featuredCategory}>{item.category}</Text>
+                <Text style={styles.featuredCategory}>
+                  {item.categories && item.categories.length > 0 
+                    ? item.categories.join(' • ') 
+                    : item.category}
+                </Text>
                 <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
               </View>
             </Pressable>

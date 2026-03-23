@@ -72,8 +72,9 @@ export default function ActDetail() {
 
     const [activeSection, setActiveSection] = useState('biography');
     const [categories, setCategories] = useState<any[]>([]);
-    const [modalVisible, setModalVisible] = useState(false);
+    const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [selectedVideo, setSelectedVideo] = useState<any>(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -101,7 +102,9 @@ export default function ActDetail() {
                 is_published: act.is_published,
                 photos_url: act.photos_url || [],
                 video_gallery: act.video_gallery || [],
-                social_links: act.social_links || { instagram: '', tiktok: '', website: '' }
+                social_links: act.social_links || { instagram: '', tiktok: '', website: '' },
+                category_ids: act.category_ids || (act.category_id ? [act.category_id] : []),
+                categories: act.categories || (act.category ? [act.category] : [])
             });
         }
     }, [act]);
@@ -120,7 +123,7 @@ export default function ActDetail() {
             // Sync profiles table (the reading source for useAct)
             const { error: profError } = await supabase.from('profiles').update({
                 name: editedData.artistName,
-                city: editedData.location,
+                city: (editedData.location || '').trim().replace(/,$/, '').trim(),
                 avatar_url: editedData.avatar_url,
                 banner_url: editedData.banner_url,
                 category_id: editedData.category_id,
@@ -131,7 +134,9 @@ export default function ActDetail() {
                 is_published: editedData.is_published,
                 price_guide: editedData.price_guide,
                 photos_url: editedData.photos_url || [],
-                video_gallery: editedData.video_gallery || []
+                video_gallery: editedData.video_gallery || [],
+                category_ids: editedData.category_ids || [],
+                categories: editedData.categories || []
             }).eq('id', targetId);
 
             if (profError) {
@@ -153,6 +158,8 @@ export default function ActDetail() {
                 is_published: editedData.is_published,
                 photos_url: editedData.photos_url || [],
                 video_gallery: editedData.video_gallery || [],
+                category_ids: editedData.category_ids || [],
+                categories: editedData.categories || [],
                 social_links: editedData.social_links
             }, { onConflict: 'owner_id' });
 
@@ -413,49 +420,76 @@ export default function ActDetail() {
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
                 allowsMultipleSelection: false,
                 quality: 0.7,
-                base64: true,
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 setIsSaving(true);
                 const asset = result.assets[0];
-                let blob: Blob;
-                const fileExt = asset.uri.split('.').pop() || 'mp4';
                 
-                if (asset.base64) {
-                    const cleanBase64 = asset.base64.includes(',') ? asset.base64.split(',')[1] : asset.base64;
-                    const byteCharacters = atob(cleanBase64);
-                    const byteArrays = [];
-                    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                        const slice = byteCharacters.slice(offset, offset + 512);
-                        const byteNumbers = new Array(slice.length);
-                        for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
-                        byteArrays.push(new Uint8Array(byteNumbers));
-                    }
-                    blob = new Blob(byteArrays, { type: `video/${fileExt}` });
-                } else {
+                // --- DIAGNOSTIC LOGS ---
+                const { data: { user } } = await supabase.auth.getUser();
+                console.log('Upload Debug:', {
+                    uploaderId: user?.id,
+                    targetOwnerId: act?.owner_id,
+                    uri: asset.uri,
+                    size: asset.fileSize || 'unknown',
+                    type: asset.type
+                });
+
+                let blob: Blob;
+                const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'mp4';
+                
+                // Use the current user's ID for the path to satisfy RLS if target owner is different (e.g. admin editing)
+                // But fallback to owner_id if available.
+                const folderId = user?.id || act?.owner_id || 'unknown';
+                const fileName = `${folderId}/video-${Date.now()}.${fileExt}`;
+                console.log('Generated fileName:', fileName);
+
+                // Use fetch for more reliable blob conversion (works on Web & Mobile)
+                try {
                     const response = await fetch(asset.uri);
                     blob = await response.blob();
+                    console.log('Blob size check:', blob.size);
+                } catch (fetchError) {
+                    console.error('Error fetching video asset:', fetchError);
+                    throw new Error('No se pudo procesar el archivo. Revisa que el video no esté en iCloud o en una red lenta.');
                 }
                 
-                const fileName = `${act?.owner_id}/video-${Date.now()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
+                console.log('Starting Supabase upload...');
+
+                const { error: uploadError, data } = await supabase.storage
                     .from('media')
-                    .upload(fileName, blob, { contentType: `video/${fileExt}`, upsert: true });
+                    .upload(fileName, blob, { 
+                        contentType: `video/${fileExt}`, 
+                        upsert: true,
+                        cacheControl: '3600'
+                    });
 
-                if (uploadError) throw uploadError;
+                if (uploadError) {
+                    console.error('Supabase Storage Upload Error:', uploadError);
+                    throw uploadError;
+                }
 
+                console.log('Upload successful:', data);
                 const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
 
                 setEditedData((prev: any) => ({
                     ...prev,
-                    video_gallery: [...(prev?.video_gallery || []), { id: Date.now().toString(), url: publicUrl, type: 'upload' }]
+                    video_gallery: [...(prev?.video_gallery || []), { 
+                        id: Date.now().toString(), 
+                        url: publicUrl, 
+                        type: 'upload',
+                        videoType: 'upload' 
+                    }]
                 }));
 
-                Toast.show({ type: 'success', text1: 'Video subido' });
+                Toast.show({ type: 'success', text1: 'Video subido correctamente' });
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Error uploading video');
+            console.error('handleAddVideoUpload catch:', error);
+            const msg = error.message || 'Error uploading video';
+            if (Platform.OS === 'web') alert(`Error: ${msg}`);
+            else Alert.alert('Error', msg);
         } finally {
             setIsSaving(false);
         }
@@ -635,10 +669,12 @@ export default function ActDetail() {
                             />
                             <Pressable 
                                 style={[styles.editInput, { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-                                onPress={() => setModalVisible(true)}
+                                onPress={() => setCategoryModalVisible(true)}
                             >
-                                <Text style={{ color: editedData?.category ? '#fff' : COLORS.textDim }}>
-                                    {editedData?.category || 'Select Category'}
+                                <Text style={{ color: (editedData?.categories && editedData.categories.length > 0) ? '#fff' : COLORS.textDim }}>
+                                    {editedData?.categories && editedData.categories.length > 0
+                                        ? editedData.categories.join(', ')
+                                        : 'Select Categories'}
                                 </Text>
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>
@@ -649,7 +685,17 @@ export default function ActDetail() {
                                 <Text style={styles.artistNameHeader}>{displayAct.artistName}</Text>
                             </View>
                             <View style={styles.taglineRow}>
-                                <Text style={styles.categoryTag}>{displayAct.category}</Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                                    {(displayAct.categories && displayAct.categories.length > 0) ? (
+                                        displayAct.categories.map((cat: string, i: number) => (
+                                            <View key={i} style={styles.categoryBadge}>
+                                                <Text style={styles.categoryTag}>{cat}</Text>
+                                            </View>
+                                        ))
+                                    ) : (
+                                        <Text style={styles.categoryTag}>{displayAct.category}</Text>
+                                    )}
+                                </View>
                                 <View style={styles.dot} />
                                 <MapPin color={COLORS.primary} size={12} style={{ marginRight: 4 }} />
                                 <Text style={styles.locationTag}>{displayAct.location}</Text>
@@ -760,7 +806,12 @@ export default function ActDetail() {
                         </View>
                     ) : (
                         <View style={styles.detailsGrid}>
-                            <DetailItem label="Art Type" value={displayAct.category} />
+                            <DetailItem 
+                                label="Art Type" 
+                                value={displayAct.categories && displayAct.categories.length > 0 
+                                    ? displayAct.categories.join(' • ') 
+                                    : displayAct.category} 
+                            />
                             <DetailItem label="Specialty" value={displayAct.genre || displayAct.artist_type || 'Performer'} />
                             <DetailItem label="Experience" value={`${displayAct.experience_years || 5}+ Years`} />
                             <DetailItem label="Base" value={displayAct.location_base || displayAct.location || 'Dubai, UAE'} />
@@ -904,13 +955,13 @@ export default function ActDetail() {
 
                                 return (
                                     <View key={`${item.type}-${i}`} style={[styles.mediaItem, { aspectRatio: 1, height: undefined }]}>
-                                        <Pressable 
+                                         <Pressable 
                                             style={{ flex: 1 }} 
                                             onPress={() => {
                                                 if (isVideo) {
                                                     setSelectedVideo(item);
                                                 } else if (item.url) {
-                                                    setModalVisible(true);
+                                                    setSelectedImage(item.url);
                                                 }
                                             }}
                                         >
@@ -1176,39 +1227,96 @@ export default function ActDetail() {
 
     const renderCategoryModal = () => (
         <Modal
-            visible={modalVisible}
+            visible={categoryModalVisible}
             transparent={true}
             animationType="fade"
-            onRequestClose={() => setModalVisible(false)}
+            onRequestClose={() => setCategoryModalVisible(false)}
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Select Category</Text>
-                        <Pressable onPress={() => setModalVisible(false)}>
+                        <View>
+                            <Text style={styles.modalTitle}>Select Categories</Text>
+                            <Text style={styles.modalSubtitle}>Select all that apply</Text>
+                        </View>
+                        <Pressable onPress={() => setCategoryModalVisible(false)}>
                             <X size={24} color="#fff" />
                         </Pressable>
                     </View>
                     <ScrollView style={styles.categoryList}>
-                        {categories.map((cat) => (
-                            <Pressable 
-                                key={cat.id} 
-                                style={styles.categoryItem}
-                                onPress={() => {
-                                    setEditedData((p: any) => ({ ...p, category: cat.name, category_id: cat.id }));
-                                    setModalVisible(false);
-                                }}
-                            >
-                                <Text style={[
-                                    styles.categoryItemText,
-                                    editedData?.category_id === cat.id && { color: COLORS.primary, fontWeight: 'bold' }
-                                ]}>
-                                    {cat.name}
-                                </Text>
-                                {editedData?.category_id === cat.id && <Check size={16} color={COLORS.primary} />}
-                            </Pressable>
-                        ))}
+                        {categories.map((cat) => {
+                            const isSelected = editedData?.category_ids?.includes(cat.id);
+                            return (
+                                <Pressable 
+                                    key={cat.id} 
+                                    style={[
+                                        styles.categoryItem,
+                                        isSelected && { backgroundColor: 'rgba(204, 255, 0, 0.1)' }
+                                    ]}
+                                    onPress={() => {
+                                        const currentIds = editedData?.category_ids || [];
+                                        const currentNames = editedData?.categories || [];
+                                        
+                                        let nextIds, nextNames;
+                                        if (isSelected) {
+                                            nextIds = currentIds.filter((id: string) => id !== cat.id);
+                                            nextNames = currentNames.filter((name: string) => name !== cat.name);
+                                        } else {
+                                            nextIds = [...currentIds, cat.id];
+                                            nextNames = [...currentNames, cat.name];
+                                        }
+                                        
+                                        setEditedData((p: any) => ({ 
+                                            ...p, 
+                                            category_ids: nextIds,
+                                            categories: nextNames,
+                                            // Keep legacy fields updated with the first selection for safety
+                                            category: nextNames[0] || '',
+                                            category_id: nextIds[0] || null
+                                        }));
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.categoryItemText,
+                                        isSelected && { color: COLORS.primary, fontWeight: 'bold' }
+                                    ]}>
+                                        {cat.name}
+                                    </Text>
+                                    {isSelected && <Check size={16} color={COLORS.primary} />}
+                                </Pressable>
+                            );
+                        })}
                     </ScrollView>
+                    <Pressable 
+                        style={[styles.editBarSave, { marginTop: 20, width: '100%' }]} 
+                        onPress={() => setCategoryModalVisible(false)}
+                    >
+                        <Text style={styles.saveButtonText}>CONFIRMAR</Text>
+                    </Pressable>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    const renderImageModal = () => (
+        <Modal
+            visible={!!selectedImage}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setSelectedImage(null)}
+        >
+            <View style={styles.modalBackground}>
+                <Pressable style={styles.closeModalBtn} onPress={() => setSelectedImage(null)}>
+                    <X size={32} color="#fff" />
+                </Pressable>
+                <View style={{ width: '90%', height: '80%', justifyContent: 'center', alignItems: 'center' }}>
+                    {selectedImage && (
+                        <Image 
+                            source={{ uri: selectedImage }} 
+                            style={{ width: '100%', height: '100%', borderRadius: 12 }} 
+                            resizeMode="contain" 
+                        />
+                    )}
                 </View>
             </View>
         </Modal>
@@ -1249,6 +1357,7 @@ export default function ActDetail() {
         <View style={styles.container}>
             {renderEditBar()}
             {renderCategoryModal()}
+            {renderImageModal()}
             <ScrollView
                 ref={scrollViewRef}
                 stickyHeaderIndices={[1]}
@@ -1502,6 +1611,14 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    categoryBadge: {
+        backgroundColor: 'rgba(204, 255, 0, 0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(204, 255, 0, 0.3)',
     },
     metaRow: {
         flexDirection: 'row',
@@ -2109,6 +2226,11 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    modalSubtitle: {
+        color: COLORS.textDim,
+        fontSize: 14,
+        marginTop: 4,
     },
     categoryList: {
         padding: 10,

@@ -283,7 +283,9 @@ export default function ProfileScreen() {
                 <View style={styles.nameSection}>
                     <Text style={styles.nameText}>{artistAct?.name || profile?.name || 'Artist Name'}</Text>
                     <Text style={styles.locationText}>
-                        {displayLocation} • {artistAct?.artist_type || 'Specialty Act'}
+                        {displayLocation} • {artistAct?.categories && artistAct.categories.length > 0 
+                            ? artistAct.categories.join(' • ') 
+                            : artistAct?.artist_type || 'Specialty Act'}
                     </Text>
                     <View style={styles.membershipBadge}>
                         <Zap size={10} color={COLORS.background} fill={COLORS.background} />

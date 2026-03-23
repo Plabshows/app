@@ -15,6 +15,23 @@ import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, Style
 import { COLORS, SPACING } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { Check } from 'lucide-react-native';
+
+const CATEGORY_LIST = [
+    { id: '636d2dcd-3e1d-4b1e-b111-a6400ca1b025', name: 'Musician' },
+    { id: 'bf451e54-4edb-4453-8ff7-f74a3882e89c', name: 'Dancer' },
+    { id: 'f26b86db-2ef5-476b-bf53-3a09d4ecba17', name: 'Magic' },
+    { id: '42f050db-aa72-4a8f-97ba-8521b4c1ec03', name: 'Roaming' },
+    { id: '95585a4e-1cc1-417e-a064-7f210b9c2996', name: 'Fire & Flow' },
+    { id: '6e2eba1a-54ee-4360-95b1-932089633089', name: 'Circus' },
+    { id: 'bff4df18-b95f-4f7e-821b-ab303b030c9a', name: 'DJ' },
+    { id: '7dc05cb1-fa8a-4317-9c17-d2682831d73c', name: 'Specialty Act' },
+    { id: 'd2a26c3d-cae5-44be-b93d-69dff6d8413b', name: 'Presenter' },
+    { id: '0213d374-c4f2-48b7-bfe8-da15cfd79ed9', name: 'Comedian' },
+    { id: '0ca60f4f-2c8b-421c-9711-88f1e9327cb8', name: 'Singer' },
+    { id: '3f2c5fde-a1b9-4e10-a653-8f851a34b678', name: 'Others' },
+    { id: '8a662c88-7702-4ec7-bd70-671d707a0774', name: 'Art' },
+];
 
 interface StepProps {
     data: any;
@@ -109,6 +126,48 @@ export const ArtistInfoStep = ({ data, updateData, onNext }: StepProps) => (
                 placeholder="Describe your act and style..."
                 placeholderTextColor={COLORS.textDim}
             />
+        </View>
+
+        <View style={styles.field}>
+            <Text style={styles.label}>Categories (Select multiple)</Text>
+            <View style={styles.categoryGrid}>
+                {CATEGORY_LIST.map((cat) => {
+                    const isSelected = data.category_ids?.includes(cat.id);
+                    return (
+                        <Pressable 
+                            key={cat.id}
+                            style={[
+                                styles.categoryChip,
+                                isSelected && styles.categoryChipActive
+                            ]}
+                            onPress={() => {
+                                const currentIds = data.category_ids || [];
+                                const currentCats = data.categories || [];
+                                
+                                if (isSelected) {
+                                    updateData({
+                                        category_ids: currentIds.filter((id: string) => id !== cat.id),
+                                        categories: currentCats.filter((name: string) => name !== cat.name)
+                                    });
+                                } else {
+                                    updateData({
+                                        category_ids: [...currentIds, cat.id],
+                                        categories: [...currentCats, cat.name]
+                                    });
+                                }
+                            }}
+                        >
+                            <Text style={[
+                                styles.categoryChipText,
+                                isSelected && styles.categoryChipTextActive
+                            ]}>
+                                {cat.name}
+                            </Text>
+                            {isSelected && <Check size={14} color={COLORS.background} style={{ marginLeft: 4 }} />}
+                        </Pressable>
+                    );
+                })}
+            </View>
         </View>
 
         <Pressable style={styles.nextButton} onPress={onNext}>
@@ -830,6 +889,35 @@ const styles = StyleSheet.create({
         padding: 16,
         color: COLORS.text,
         fontSize: 16,
+    },
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 8,
+    },
+    categoryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    categoryChipActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    categoryChipText: {
+        color: COLORS.textDim,
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    categoryChipTextActive: {
+        color: COLORS.background,
+        fontWeight: '700',
     },
     textArea: {
         height: 120,

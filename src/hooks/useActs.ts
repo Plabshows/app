@@ -7,6 +7,8 @@ export interface Act {
     title?: string;
     category: string;
     category_id?: string;
+    category_ids?: string[];
+    categories?: string[];
     image_url: string;
     banner_url?: string;
     avatar_url?: string;
@@ -79,6 +81,8 @@ export function useActs() {
                     ...item,
                     // Resolve category name from static map
                     category: CATEGORY_MAP[item.category_id] || item.category || 'Artist',
+                    category_ids: item.category_ids || [],
+                    categories: item.categories || [],
                     // Best available image — no filtering
                     image_url: item.avatar_url
                         || item.banner_url
@@ -91,7 +95,8 @@ export function useActs() {
                 // Client-side category filter applied after fetching all
                 if (category) {
                     mapped = mapped.filter(a =>
-                        a.category?.toLowerCase() === category.toLowerCase()
+                        a.category?.toLowerCase() === category.toLowerCase() ||
+                        a.categories?.some((c: string) => c.toLowerCase() === category.toLowerCase())
                     );
                 }
 
