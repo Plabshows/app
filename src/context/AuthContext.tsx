@@ -132,28 +132,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
 
         // Subscribe to auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
-            console.log('[Auth Event]', event);
-            handleAuthStateChange(currentSession);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+            console.log('[Auth Event]', event, currentSession?.user?.email);
+            
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                handleAuthStateChange(currentSession);
+            } else if (event === 'SIGNED_OUT') {
+                handleAuthStateChange(null);
+            }
         });
 
-        // Small delay to allow the subscription to fire its initial event if it's going to
-        const timer = setTimeout(async () => {
-            if (mounted && loading) {
-                console.log('[Auth Context] Manual session check (fallback)');
-                const { data: { session: initialSession } } = await supabase.auth.getSession();
-                if (mounted && loading) {
+        // Initial session check
+        const checkInitialSession = async () => {
+            try {
+                const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('[Auth Context] Error getting initial session:', error);
+                }
+                
+                if (initialSession && mounted) {
+                    console.log('[Auth Context] Initial session found:', initialSession.user?.email);
                     handleAuthStateChange(initialSession);
+                } else if (mounted) {
+                    console.log('[Auth Context] No initial session found');
+                    setLoading(false);
+                }
+            } catch (err) {
+                if (mounted) {
+                    console.error('[Auth Context] Fatal error in initial session check:', err);
+                    setLoading(false);
                 }
             }
-        }, 500);
+        };
+
+        checkInitialSession();
 
         return () => {
             mounted = false;
             subscription.unsubscribe();
-            clearTimeout(timer);
         };
-    }, [loading]);
+    }, []);
 
     const refreshAuth = async () => {
         setLoading(true);
