@@ -20,6 +20,7 @@ import {
 import { COLORS, SPACING } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '../../src/lib/supabase';
+import { APP_CATEGORIES } from '../../src/constants/categories';
 
 const ARTIST_TYPES = ['Solo', 'Duo', 'Trio', 'Quartet', 'Band (5+)', 'Group/Crew'];
 
@@ -27,7 +28,7 @@ export default function UnifiedEditProfile() {
     const { user, refreshAuth } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>(APP_CATEGORIES);
 
     // Unified State
     const [profileData, setProfileData] = useState({
@@ -40,6 +41,7 @@ export default function UnifiedEditProfile() {
         // From 'acts' table
         act_name: '',
         category_id: '',
+        category_ids: [] as string[],
         artist_type: '',
         genre: '',
         bio: '',
@@ -62,9 +64,8 @@ export default function UnifiedEditProfile() {
 
     const fetchData = async () => {
         try {
-            const { data: catData } = await supabase.from('categories').select('*').order('name');
-            setCategories(catData || []);
-
+            // No longer fetching categories from DB, using APP_CATEGORIES constant
+            
             if (!user) {
                 console.log('[fetchData] No user found in AuthContext');
                 return;
@@ -83,6 +84,7 @@ export default function UnifiedEditProfile() {
                 country: prof?.country || '',
                 act_name: act?.name || '',
                 category_id: act?.category_id || '',
+                category_ids: Array.isArray(act?.category_ids) ? act.category_ids : (act?.category_id ? [act.category_id] : []),
                 artist_type: act?.artist_type || '',
                 genre: act?.genre || '',
                 bio: act?.description || '',
@@ -209,8 +211,10 @@ export default function UnifiedEditProfile() {
                     name: profileData.full_name,
                     city: profileData.city,
                     country: profileData.country,
-                    // 🎯 Avatar = cover image (first photo or existing)
-                    avatar_url: coverImageUrl
+                    avatar_url: coverImageUrl,
+                    category_ids: profileData.category_ids,
+                    // Backward compatibility for single category apps
+                    category_id: profileData.category_ids[0] || null
                 })
                 .eq('id', user.id)
                 .select();
@@ -228,10 +232,12 @@ export default function UnifiedEditProfile() {
                 .eq('owner_id', user.id)
                 .maybeSingle();
 
+            // 2. Update Act (Partial Update to avoid unique constraint issues)
+            console.log(`[handleSave] Step 2: Updating acts for owner_id ${user.id}...`);
+            
             const actPayload: any = {
-                owner_id: user.id,
-                name: profileData.act_name,
-                category_id: profileData.category_id || null,
+                category_id: profileData.category_ids[0] || null,
+                category_ids: profileData.category_ids,
                 artist_type: profileData.artist_type,
                 genre: profileData.genre,
                 description: profileData.bio,
@@ -241,16 +247,24 @@ export default function UnifiedEditProfile() {
                 photos_url: updatedPhotos.length > 0 ? updatedPhotos : []
             };
 
+            // Only include name if it has actually changed
+            const { data: latestActCheck } = await supabase.from('acts').select('name').eq('owner_id', user.id).maybeSingle();
+            if (profileData.act_name && profileData.act_name !== latestActCheck?.name) {
+                actPayload.name = profileData.act_name;
+            }
+
             let actUpdateError = null;
-            if (existingAct) {
-                console.log('[handleSave] Updating existing act:', existingAct.id);
+            if (latestActCheck) {
+                console.log('[handleSave] Updating existing act');
                 const { error } = await supabase
                     .from('acts')
                     .update(actPayload)
-                    .eq('id', existingAct.id);
+                    .eq('owner_id', user.id);
                 actUpdateError = error;
             } else {
                 console.log('[handleSave] Inserting new act');
+                actPayload.owner_id = user.id;
+                actPayload.name = profileData.act_name;
                 const { error } = await supabase
                     .from('acts')
                     .insert(actPayload);
@@ -357,13 +371,15 @@ export default function UnifiedEditProfile() {
 
                     <View style={styles.row}>
                         <View style={[styles.field, { flex: 1, marginRight: 12 }]}>
-                            <Text style={[styles.label, errors.includes('category_id') && { color: COLORS.error }]}>Category</Text>
+                            <Text style={[styles.label, errors.includes('category_id') && { color: COLORS.error }]}>Categories</Text>
                             <Pressable
                                 style={[styles.dropdown, errors.includes('category_id') && styles.inputError]}
                                 onPress={() => { setModalType('category'); setModalVisible(true); }}
                             >
-                                <Text style={[styles.dropdownText, !profileData.category_id && { color: COLORS.textDim }]}>
-                                    {categories.find(c => c.id === profileData.category_id)?.name || 'Select'}
+                                <Text style={[styles.dropdownText, profileData.category_ids.length === 0 && { color: COLORS.textDim }]}>
+                                    {profileData.category_ids.length > 0
+                                        ? profileData.category_ids.map(id => categories.find(c => c.id === id)?.name).filter(Boolean).join(', ')
+                                        : 'Select Talents'}
                                 </Text>
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>
@@ -482,12 +498,28 @@ export default function UnifiedEditProfile() {
                                         key={modalType === 'category' ? item.id : item}
                                         style={styles.modalItem}
                                         onPress={() => {
-                                            if (modalType === 'category') setProfileData({ ...profileData, category_id: item.id });
-                                            else setProfileData({ ...profileData, artist_type: item });
-                                            setModalVisible(false);
+                                            if (modalType === 'category') {
+                                                const currentIds = [...profileData.category_ids];
+                                                const index = currentIds.indexOf(item.id);
+                                                if (index > -1) {
+                                                    currentIds.splice(index, 1);
+                                                } else {
+                                                    currentIds.push(item.id);
+                                                }
+                                                setProfileData({ ...profileData, category_ids: currentIds });
+                                            } else {
+                                                setProfileData({ ...profileData, artist_type: item });
+                                                setModalVisible(false);
+                                            }
                                         }}
                                     >
-                                        <Text style={styles.modalItemText}>{modalType === 'category' ? item.name : item}</Text>
+                                        <Text style={[
+                                            styles.modalItemText,
+                                            modalType === 'category' && profileData.category_ids.includes(item.id) && { color: COLORS.primary, fontWeight: 'bold' }
+                                        ]}>
+                                            {modalType === 'category' ? item.name : item}
+                                            {modalType === 'category' && profileData.category_ids.includes(item.id) && " ✓"}
+                                        </Text>
                                     </Pressable>
                                 ))}
                             </ScrollView>

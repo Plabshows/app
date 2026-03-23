@@ -5,7 +5,9 @@ import { Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-const CATEGORIES = ['All', 'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian'];
+import { APP_CATEGORIES } from '@/src/constants/categories';
+
+const CATEGORIES = ['All', ...APP_CATEGORIES.map(c => c.name)];
 
 import { Act } from '@/src/hooks/useActs';
 

@@ -23,6 +23,7 @@ import { COLORS } from '../../../../src/constants/theme';
 import { useAuth } from '../../../../src/context/AuthContext';
 import { logAdminAction } from '../../../../src/lib/audit';
 import { supabase } from '../../../../src/lib/supabase';
+import { APP_CATEGORIES } from '../../../../src/constants/categories';
 
 const ARTIST_TYPES = ['Solo', 'Duo', 'Trio', 'Quartet', 'Band (5+)', 'Group/Crew'];
 
@@ -33,7 +34,7 @@ export default function AdminManageAct() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>(APP_CATEGORIES);
 
     // Unified State
     const [profileData, setProfileData] = useState({
@@ -51,7 +52,8 @@ export default function AdminManageAct() {
         is_verified: false,
         is_published: false,
         is_public: false,
-        act_is_published: false
+        act_is_published: false,
+        category_ids: [] as string[]
     });
 
     const [modalVisible, setModalVisible] = useState(false);
@@ -98,9 +100,7 @@ export default function AdminManageAct() {
 
     const fetchData = async () => {
         try {
-            const { data: catData } = await supabase.from('categories').select('*').order('name');
-            setCategories(catData || []);
-
+            // No longer fetching categories from DB, using APP_CATEGORIES constant
             if (!targetUserId) return;
 
             // Fetch Profile
@@ -124,7 +124,8 @@ export default function AdminManageAct() {
                 is_verified: prof?.is_verified || false,
                 is_published: prof?.is_published || false,
                 is_public: prof?.is_public || false,
-                act_is_published: act?.is_published || false
+                act_is_published: act?.is_published || false,
+                category_ids: Array.isArray(act?.category_ids) ? act.category_ids : (act?.category_id ? [act.category_id] : [])
             });
 
             const photos = Array.isArray(act?.photos_url) ? act.photos_url : [];
@@ -295,7 +296,10 @@ export default function AdminManageAct() {
                 avatar_url: coverImageUrl,
                 is_verified: profileData.is_verified,
                 is_published: profileData.is_published,
-                is_public: profileData.is_public
+                is_public: profileData.is_public,
+                category_ids: profileData.category_ids,
+                // Backward compatibility
+                category_id: profileData.category_ids[0] || null
             }).eq('id', targetUserId).select();
 
             console.log(`[AdminSave] Profile update result:`, { updatedProfile, profError });
@@ -305,12 +309,13 @@ export default function AdminManageAct() {
                 throw new Error("RLS: No se guardó profiles. Revisa permisos (0 filas).");
             }
 
-            // 2. Upsert Act
-            console.log(`[AdminSave] Step 2: Upserting acts for owner_id ${targetUserId}...`);
-            const { data: updatedAct, error: actError } = await supabase.from('acts').upsert({
-                owner_id: targetUserId,
-                name: profileData.act_name,
-                category_id: profileData.category_id || null,
+            // 2. Update Act (Partial Update to avoid unique constraint issues)
+            console.log(`[AdminSave] Step 2: Updating acts for owner_id ${targetUserId}...`);
+            
+            // Build act payload dynamically to omit 'name' if it's unchanged
+            const actPayload: any = {
+                category_id: profileData.category_ids[0] || null,
+                category_ids: profileData.category_ids,
                 artist_type: profileData.artist_type,
                 genre: profileData.genre,
                 description: profileData.bio,
@@ -319,9 +324,27 @@ export default function AdminManageAct() {
                 image_url: coverImageUrl,
                 photos_url: updatedPhotos,
                 is_published: profileData.act_is_published
-            }, { onConflict: 'owner_id' }).select();
+            };
 
-            console.log(`[AdminSave] Act upsert result:`, { updatedAct, actError });
+            // Only include name if it has actually changed to avoid acts_name_key duplicate error
+            const { data: latestActCheck } = await supabase.from('acts').select('name').eq('owner_id', targetUserId).maybeSingle();
+            if (profileData.act_name && profileData.act_name !== latestActCheck?.name) {
+                actPayload.name = profileData.act_name;
+            }
+
+            let actUpdateResult;
+            if (latestActCheck) {
+                console.log(`[AdminSave] Updating existing act for ${targetUserId}`);
+                actUpdateResult = await supabase.from('acts').update(actPayload).eq('owner_id', targetUserId).select();
+            } else {
+                console.log(`[AdminSave] Inserting new act for ${targetUserId}`);
+                actPayload.owner_id = targetUserId;
+                actPayload.name = profileData.act_name; // Must include name for new inserts
+                actUpdateResult = await supabase.from('acts').insert(actPayload).select();
+            }
+
+            const { data: updatedAct, error: actError } = actUpdateResult;
+            console.log(`[AdminSave] Act update result:`, { updatedAct, actError });
 
             if (actError) throw actError;
             if (!updatedAct || updatedAct.length === 0) {
@@ -469,8 +492,10 @@ export default function AdminManageAct() {
                                 style={[styles.dropdown, errors.includes('category_id') && styles.inputError]}
                                 onPress={() => { setModalType('category'); setModalVisible(true); }}
                             >
-                                <Text style={[styles.dropdownText, !profileData.category_id && { color: COLORS.textDim }]}>
-                                    {categories.find(c => c.id === profileData.category_id)?.name || 'Select'}
+                                <Text style={[styles.dropdownText, profileData.category_ids.length === 0 && { color: COLORS.textDim }]}>
+                                    {profileData.category_ids.length > 0
+                                        ? profileData.category_ids.map(id => categories.find(c => c.id === id)?.name).filter(Boolean).join(', ')
+                                        : 'Select Talents'}
                                 </Text>
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>

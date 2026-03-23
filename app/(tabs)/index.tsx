@@ -1,25 +1,17 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
-import { useActs, CATEGORY_MAP } from '@/src/hooks/useActs';
+import { useActs } from '@/src/hooks/useActs';
 import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { APP_CATEGORIES, CATEGORY_ICONS, CATEGORY_MAP } from '@/src/constants/categories';
 import {
   Award,
   CheckCircle,
-  Cloud,
-  Disc,
-  Flame,
   Ghost,
-  Mic,
-  Monitor,
-  Music,
   Search,
   ShieldCheck,
   Sparkles,
-  Star,
-  Users,
-  Wand,
-  Zap
+  Star
 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -39,47 +31,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-
-const TOP_CATEGORIES = [
-  { id: 'musician', name: 'Musician', icon: Music },
-  { id: 'dj', name: 'DJ', icon: Disc },
-  { id: 'magic', name: 'Magic', icon: Wand },
-  { id: 'dancer', name: 'Dancer', icon: Users },
-  { id: 'circus', name: 'Circus', icon: Ghost },
-  { id: 'specialty_act', name: 'Specialty Act', icon: Star },
-  { id: 'fire_flow', name: 'Fire & Flow', icon: Flame },
-  { id: 'presenter', name: 'Presenter', icon: Mic },
-  { id: 'comedian', name: 'Comedian', icon: Mic },
-];
-
-const BOTTOM_CATEGORIES = [
-  'Musician', 'DJ', 'Magic', 'Dancer', 'Circus', 'Specialty Act', 'Fire & Flow', 'Presenter', 'Comedian'
-];
-
-const CATEGORY_ICONS = {
-  'Musician': Music,
-  'DJ': Disc,
-  'Magic': Wand,
-  'Dancer': Users,
-  'Circus': Ghost,
-  'Specialty Act': Star,
-  'Fire & Flow': Flame,
-  'Presenter': Mic,
-  'Comedian': Mic,
-  'Roaming': Users,
-
-  // Legacy mappings for safety
-  'Musicians': Music,
-  'Dancers': Users,
-  'Aerialists': Cloud,
-  'Tech': Monitor,
-  'LED Shows': Zap,
-  'Magicians': Wand,
-  'Fire': Flame,
-  'DJs': Disc,
-  'Comedians': Mic,
-  'Specialty Acts': Star,
-};
+const TOP_CATEGORIES = APP_CATEGORIES;
+const BOTTOM_CATEGORIES = APP_CATEGORIES.map(c => c.name);
 
 export default function DiscoverScreen() {
   const router = useRouter();

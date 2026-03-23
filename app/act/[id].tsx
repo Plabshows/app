@@ -144,10 +144,10 @@ export default function ActDetail() {
                 throw profError;
             }
 
-            // Upsert acts table
-            const { error: actError } = await supabase.from('acts').upsert({
-                owner_id: targetId,
-                name: editedData.artistName,
+            // Update Act (Partial Update to avoid unique constraint issues)
+            console.log(`[handleSave] Step 2: Updating acts for owner_id ${targetId}...`);
+            
+            const actPayload: any = {
                 description: editedData.description,
                 category: editedData.category,
                 category_id: editedData.category_id,
@@ -161,11 +161,24 @@ export default function ActDetail() {
                 category_ids: editedData.category_ids || [],
                 categories: editedData.categories || [],
                 social_links: editedData.social_links
-            }, { onConflict: 'owner_id' });
+            };
 
-            if (actError) {
-                console.error('[handleSave] Acts upsert error:', actError);
-                throw actError;
+            // Only include name if it has actually changed
+            const { data: latestActCheck } = await supabase.from('acts').select('name').eq('owner_id', targetId).maybeSingle();
+            if (editedData.artistName && editedData.artistName !== latestActCheck?.name) {
+                actPayload.name = editedData.artistName;
+            }
+
+            if (latestActCheck) {
+                console.log(`[handleSave] Updating existing act`);
+                const { error } = await supabase.from('acts').update(actPayload).eq('owner_id', targetId);
+                if (error) throw error;
+            } else {
+                console.log(`[handleSave] Inserting new act`);
+                actPayload.owner_id = targetId;
+                actPayload.name = editedData.artistName;
+                const { error } = await supabase.from('acts').insert(actPayload);
+                if (error) throw error;
             }
 
             console.log('[handleSave] Success!');

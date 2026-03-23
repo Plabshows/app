@@ -350,6 +350,12 @@ export default function AdminDashboard() {
 
             if (error) throw error;
 
+            // Also update the 'acts' table to keep visibility in sync
+            await supabase
+                .from('acts')
+                .update({ is_published: !currentStatus })
+                .eq('owner_id', userId);
+
             // Audit Log
             if (user) {
                 await logAdminAction(user.id, userId, 'toggle_published', { newValue: !currentStatus });
