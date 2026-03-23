@@ -1,0 +1,22 @@
+-- Seed Production Data for Plabshows
+-- This seeds the acts table with high-quality mock data
+
+-- 1. Create a system profile for mock acts (if needed, but owner_id can be null)
+-- 2. Insert Acts (Set is_published to true)
+
+INSERT INTO acts (title, category, price_range, image_url, video_url, description, specs, is_published)
+VALUES
+('TV Heads', 'Roaming', '$1,500 - $3,000', 'https://euphonious-kelpie-cd0a27.netlify.app/images/char_tv_head_premium.png', '', 'A sentient fusion of analog tech and high-energy dance. Features functional monitor helmets with custom branding screens.', 'Standard roaming requirements.', true),
+('Teddy Monster', 'Roaming', '$1,500 - $3,000', 'https://euphonious-kelpie-cd0a27.netlify.app/images/char_teddy_monster_hero_final.jpg', '', 'A chaotic, tactile explosion of hundreds of real plush toys. Designed for maximum guest engagement and high-energy movement.', 'Standard roaming requirements.', true),
+('Cyberpunk LED Crew', 'Dancer', '$1,500 - $3,000', 'https://images.unsplash.com/photo-1547153760-18fc86324498?q=80&w=1000&auto=format&fit=crop', 'https://assets.mixkit.co/videos/preview/mixkit-futuristic-neon-lights-and-structures-3269-large.mp4', 'High-energy LED dance crew with programmable suits synchronized to music.', 'Requires 10x10m stage, dark room, 3-phase power.', true),
+('Aerial Silk Virtuoso', 'Circus', '$800 - $1,500', 'https://images.unsplash.com/photo-1519925610903-38106302d559?q=80&w=1000&auto=format&fit=crop', 'https://assets.mixkit.co/videos/preview/mixkit-woman-doing-aerial-silk-exercises-40337-large.mp4', 'Elegant aerial silk performance perfect for high-end corporate events.', 'Minimum 6m ceiling height, structural rigging point required.', true),
+('Laser Violinist', 'Musician', '$2,000 - $4,000', 'https://images.unsplash.com/photo-1514525253440-b393452e8d03?q=80&w=1000&auto=format&fit=crop', 'https://assets.mixkit.co/videos/preview/mixkit-live-concert-with-lights-and-laser-beams-2826-large.mp4', 'Electric violin performance with synchronized laser show.', 'Sound system connection (XLR), haze machine permitted venue.', true),
+('Futuristic Fire Spinners', 'Fire & Flow', '$1,200 - $2,500', 'https://images.unsplash.com/photo-1504705759706-c5ee7158f8bb?q=80&w=1000&auto=format&fit=crop', 'https://assets.mixkit.co/videos/preview/mixkit-fire-dancer-making-circles-with-fire-2849-large.mp4', 'Advanced fire manipulation with futuristic costumes and pyrotechnics.', 'Outdoor or high-ceiling indoor venue with fire permit.', true),
+('LED Champagne Skirts', 'Roaming', '$1,500 - $3,000', 'https://euphonious-kelpie-cd0a27.netlify.app/images/char_led_champagne_hero_final.png', '', 'Elegant hostesses in illuminated skirts serving champagne.', 'Standard roaming requirements.', true),
+('Cosmic Girls', 'Roaming', '$1,500 - $3,000', 'https://euphonious-kelpie-cd0a27.netlify.app/images/char_cosmic_girls_premium_v2.png', '', 'High-fashion extraterrestrial aesthetics featuring iridescent sequin bodysuits and holographic helmets.', 'Standard roaming requirements.', true),
+('Neon Violinist', 'Musician', '$2,000 - $4,000', 'https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?q=80&w=1000', '', 'Classically trained violinist performing contemporary hits in a custom light-up gown.', 'Standard audio output.', true),
+('Cyber Sax', 'Musician', '$2,000 - $3,500', 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=1000', '', 'High-energy saxophone performances with LED instrument handling.', 'Wireless mic system.', true),
+('VR Art Performance', 'Specialty Act', '$3,500 - $6,000', 'https://images.unsplash.com/photo-1617802690992-8278d57d5c3d?q=80&w=1000', '', 'Live painting in Virtual Reality, projected on a large screen for guests.', 'Large screen connectivity.', true),
+('Hologram DJ', 'DJ', '$3,000 - $6,000', 'https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?q=80&w=1000', '', 'DJ performing behind a transparent holographic screen.', 'Special screen setup included.', true),
+('Laser Man', 'Specialty Act', '$1,500 - $3,000', 'https://images.unsplash.com/photo-1563297775-47029c29cc3a?q=80&w=1000', '', 'Manipulation of laser beams with hands and body.', 'Total darkness required.', true),
+('Future Fire Spinners', 'Fire & Flow', '$1,800 - $3,000', 'https://images.unsplash.com/photo-1505236273191-1dce8aca7013?q=80&w=1000', '', 'Fire performance with silver futuristic costumes.', 'Outdoor or fire-permitted indoor.', true);
