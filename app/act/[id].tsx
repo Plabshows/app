@@ -73,6 +73,7 @@ export default function ActDetail() {
     const [activeSection, setActiveSection] = useState('biography');
     const [categories, setCategories] = useState<any[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
+    const [selectedVideo, setSelectedVideo] = useState<any>(null);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -99,6 +100,7 @@ export default function ActDetail() {
                 is_verified: act.is_verified,
                 is_published: act.is_published,
                 photos_url: act.photos_url || [],
+                video_gallery: act.video_gallery || [],
                 social_links: act.social_links || { instagram: '', tiktok: '', website: '' }
             });
         }
@@ -126,10 +128,10 @@ export default function ActDetail() {
                 video_url: editedData.video_url,
                 video_urls: editedData.videos_url,
                 social_links: editedData.social_links,
-                is_verified: editedData.is_verified,
                 is_published: editedData.is_published,
                 price_guide: editedData.price_guide,
-                photos_url: editedData.photos_url || []
+                photos_url: editedData.photos_url || [],
+                video_gallery: editedData.video_gallery || []
             }).eq('id', targetId);
 
             if (profError) {
@@ -150,6 +152,7 @@ export default function ActDetail() {
                 image_url: editedData.banner_url,
                 is_published: editedData.is_published,
                 photos_url: editedData.photos_url || [],
+                video_gallery: editedData.video_gallery || [],
                 social_links: editedData.social_links
             }, { onConflict: 'owner_id' });
 
@@ -391,6 +394,7 @@ export default function ActDetail() {
         video_url: '',
         photos_url: [],
         videos_url: [],
+        video_gallery: [],
         packages: [],
         technical_specs: 'Standard performance requirements.',
         technical_rider_url: '',
@@ -402,6 +406,60 @@ export default function ActDetail() {
     };
 
     const displayAct = act || PLACEHOLDER_ACT;
+
+    const handleAddVideoUpload = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                allowsMultipleSelection: false,
+                quality: 0.7,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setIsSaving(true);
+                const asset = result.assets[0];
+                let blob: Blob;
+                const fileExt = asset.uri.split('.').pop() || 'mp4';
+                
+                if (asset.base64) {
+                    const cleanBase64 = asset.base64.includes(',') ? asset.base64.split(',')[1] : asset.base64;
+                    const byteCharacters = atob(cleanBase64);
+                    const byteArrays = [];
+                    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                        const slice = byteCharacters.slice(offset, offset + 512);
+                        const byteNumbers = new Array(slice.length);
+                        for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+                        byteArrays.push(new Uint8Array(byteNumbers));
+                    }
+                    blob = new Blob(byteArrays, { type: `video/${fileExt}` });
+                } else {
+                    const response = await fetch(asset.uri);
+                    blob = await response.blob();
+                }
+                
+                const fileName = `${act?.owner_id}/video-${Date.now()}.${fileExt}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('media')
+                    .upload(fileName, blob, { contentType: `video/${fileExt}`, upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
+
+                setEditedData((prev: any) => ({
+                    ...prev,
+                    video_gallery: [...(prev?.video_gallery || []), { id: Date.now().toString(), url: publicUrl, type: 'upload' }]
+                }));
+
+                Toast.show({ type: 'success', text1: 'Video subido' });
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Error uploading video');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const getYouTubeID = (url: string) => {
         if (!url) return null;
@@ -782,7 +840,13 @@ export default function ActDetail() {
         
         // Combine media for a unified gallery experience
         const combinedMedia = [
-            ...videos.map((url: string, index: number) => ({ type: 'video', url, originalIndex: index })),
+            ...(editedData?.video_gallery || displayAct.video_gallery || []).map((item: any) => ({ 
+                type: 'video', 
+                videoType: item.type, // 'upload' | 'external_link'
+                url: item.url,
+                id: item.id
+            })),
+            ...videos.map((url: string, index: number) => ({ type: 'video', videoType: 'external_link', url, originalIndex: index })),
             ...photos.map((url: string, index: number) => ({ type: 'photo', url, originalIndex: index }))
         ];
 
@@ -797,24 +861,35 @@ export default function ActDetail() {
                                 <>
                                     <Pressable style={[styles.addMediaItem, { aspectRatio: 1, height: undefined }]} onPress={handleAddPhoto}>
                                         <Plus color={COLORS.primary} size={28} />
-                                        <Text style={[styles.addMediaText, { fontSize: 10 }]}>+ Photo</Text>
+                                        <Text style={[styles.addMediaText, { fontSize: 8 }]}>+ FOTO</Text>
                                     </Pressable>
                                     
+                                    <Pressable style={[styles.addMediaItem, { aspectRatio: 1, height: undefined }]} onPress={handleAddVideoUpload}>
+                                        <VideoIcon color={COLORS.primary} size={28} />
+                                        <Text style={[styles.addMediaText, { fontSize: 8 }]}>+ SUBIR VIDEO</Text>
+                                    </Pressable>
+
                                     <View style={[styles.addMediaItem, { backgroundColor: '#111', borderStyle: 'dashed', aspectRatio: 1, height: undefined }]}>
                                         <TextInput
                                             style={{ color: '#fff', fontSize: 10, backgroundColor: '#222', padding: 5, borderRadius: 4, width: '90%', marginBottom: 4 }}
-                                            placeholder="YouTube URL"
+                                            placeholder="Pegar YouTube/Vimeo"
                                             placeholderTextColor="#666"
                                             onSubmitEditing={(e) => {
                                                 const url = e.nativeEvent.text;
                                                 if (url) {
-                                                    setEditedData((p: any) => ({ ...p, videos_url: [...(p?.videos_url || videos), url] }));
+                                                    setEditedData((p: any) => ({ 
+                                                        ...p, 
+                                                        video_gallery: [
+                                                            ...(p?.video_gallery || []),
+                                                            { id: Date.now().toString(), url, type: 'external_link' }
+                                                        ] 
+                                                    }));
                                                     // @ts-ignore
                                                     if (e.target) e.target.value = '';
                                                 }
                                             }}
                                         />
-                                        <Text style={{ color: COLORS.primary, fontSize: 8, fontWeight: 'bold' }}>+ Video</Text>
+                                        <Text style={{ color: COLORS.primary, fontSize: 8, fontWeight: 'bold' }}>+ LINK VIDEO</Text>
                                     </View>
                                 </>
                             )}
@@ -831,7 +906,13 @@ export default function ActDetail() {
                                     <View key={`${item.type}-${i}`} style={[styles.mediaItem, { aspectRatio: 1, height: undefined }]}>
                                         <Pressable 
                                             style={{ flex: 1 }} 
-                                            onPress={() => isVideo ? Linking.openURL(item.url) : null}
+                                            onPress={() => {
+                                                if (isVideo) {
+                                                    setSelectedVideo(item);
+                                                } else if (item.url) {
+                                                    setModalVisible(true);
+                                                }
+                                            }}
                                         >
                                             {thumbUrl ? (
                                                 <Image 
@@ -840,15 +921,25 @@ export default function ActDetail() {
                                                     resizeMode="cover"
                                                 />
                                             ) : (
-                                                <View style={[styles.mediaImage, { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }]}>
-                                                    {isVideo ? <VideoIcon color={COLORS.primary} size={32} /> : <Info color="#333" size={32} />}
-                                                </View>
+                                                isVideo && item.videoType === 'upload' ? (
+                                                    <Video
+                                                        source={{ uri: item.url }}
+                                                        style={styles.mediaImage}
+                                                        resizeMode={ResizeMode.COVER}
+                                                        isMuted
+                                                        shouldPlay={false}
+                                                    />
+                                                ) : (
+                                                    <View style={[styles.mediaImage, { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }]}>
+                                                        {isVideo ? <VideoIcon color={COLORS.primary} size={32} /> : <Info color="#333" size={32} />}
+                                                    </View>
+                                                )
                                             )}
                                             
                                             {isVideo && (
                                                 <View style={styles.playOverlay}>
                                                     <View style={{
-                                                        backgroundColor: 'rgba(204, 255, 0, 0.9)',
+                                                        backgroundColor: item.videoType === 'upload' ? COLORS.primary : 'rgba(255, 0, 0, 0.9)',
                                                         width: 36,
                                                         height: 36,
                                                         borderRadius: 18,
@@ -866,9 +957,16 @@ export default function ActDetail() {
                                                 style={styles.deletePhotoBtn}
                                                 onPress={() => {
                                                     if (isVideo) {
-                                                        const current = editedData?.videos_url || videos;
-                                                        const next = current.filter((_: any, idx: number) => idx !== item.originalIndex);
-                                                        setEditedData((p: any) => ({ ...p, videos_url: next }));
+                                                        const current = editedData?.video_gallery || displayAct.video_gallery || [];
+                                                        const next = current.filter((v: any) => v.id !== item.id);
+                                                        setEditedData((p: any) => ({ ...p, video_gallery: next }));
+                                                        
+                                                        // Also check old videos_url if it was from there
+                                                        if (item.originalIndex !== undefined) {
+                                                            const oldCurrent = editedData?.videos_url || videos;
+                                                            const oldNext = oldCurrent.filter((_: any, idx: number) => idx !== item.originalIndex);
+                                                            setEditedData((p: any) => ({ ...p, videos_url: oldNext }));
+                                                        }
                                                     } else {
                                                         const current = editedData?.photos_url || photos;
                                                         const next = current.filter((_: any, idx: number) => idx !== item.originalIndex);
@@ -894,6 +992,61 @@ export default function ActDetail() {
                         </View>
                     </View>
                 )}
+                {/* --- VIDEO PLAYER MODAL --- */}
+                <Modal
+                    visible={!!selectedVideo}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setSelectedVideo(null)}
+                >
+                    <View style={styles.modalBackground}>
+                        <Pressable style={styles.closeModalBtn} onPress={() => setSelectedVideo(null)}>
+                            <X size={32} color="#fff" />
+                        </Pressable>
+                        
+                        <View style={styles.videoModalContent}>
+                            {selectedVideo?.videoType === 'external_link' ? (
+                                Platform.OS === 'web' ? (
+                                    <View style={{ width: '100%', height: '100%', backgroundColor: '#000' }}>
+                                        {/* @ts-ignore */}
+                                        <iframe
+                                            width="100%"
+                                            height="100%"
+                                            src={`https://www.youtube.com/embed/${getYouTubeID(selectedVideo.url)}?autoplay=1`}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            style={{ border: 'none' }}
+                                        />
+                                    </View>
+                                ) : (
+                                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                                        <Text style={{ color: '#fff', fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
+                                            Este video debe abrirse en YouTube
+                                        </Text>
+                                        <Pressable 
+                                            style={[styles.editBarSave, { width: 220, alignSelf: 'center' }]} 
+                                            onPress={() => {
+                                                Linking.openURL(selectedVideo.url);
+                                                setSelectedVideo(null);
+                                            }}
+                                        >
+                                            <Text style={styles.saveButtonText}>ABRIR EN YOUTUBE</Text>
+                                        </Pressable>
+                                    </View>
+                                )
+                            ) : (
+                                <Video
+                                    source={{ uri: selectedVideo?.url }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    useNativeControls
+                                    resizeMode={ResizeMode.CONTAIN}
+                                    shouldPlay
+                                />
+                            )}
+                        </View>
+                    </View>
+                </Modal>
             </View>
         );
     };
@@ -1971,5 +2124,25 @@ const styles = StyleSheet.create({
     categoryItemText: {
         color: '#ccc',
         fontSize: 16,
+    },
+    modalBackground: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    videoModalContent: {
+        width: '95%',
+        aspectRatio: 16/9,
+        backgroundColor: '#000',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    closeModalBtn: {
+        position: 'absolute',
+        top: 40,
+        right: 20,
+        padding: 10,
+        zIndex: 100,
     },
 });

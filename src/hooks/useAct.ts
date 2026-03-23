@@ -35,6 +35,7 @@ export interface ActDetailData {
     video_url: string;
     photos_url: string[];
     videos_url: string[];
+    video_gallery: { id: string, url: string, type: 'upload' | 'external_link', thumbnail?: string }[];
     packages: any[];
     technical_specs: string;
     technical_rider_url: string;
@@ -159,6 +160,7 @@ export function useAct(id: string | string[]) {
                 video_url: actData?.video_url || prof.video_url || '',
                 photos_url: actData?.photos_url || prof.gallery_urls || prof.photos_url || [],
                 videos_url: actData?.videos_url || prof.videos_url || [],
+                video_gallery: actData?.video_gallery || prof.video_gallery || [],
                 packages: actData?.packages || prof.packages || [],
                 technical_specs: actData?.technical_specs || prof.technical_specs || '',
                 technical_rider_url: actData?.technical_rider_url || prof.technical_rider_url || '',
