@@ -87,7 +87,16 @@ export default function LoginScreen() {
                         <View style={styles.socialContainer}>
                             <Pressable
                                 style={[styles.socialButton, styles.googleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+                                onPress={() => {
+                                    const redirectUrl = Platform.OS === 'web' 
+                                        ? window.location.origin 
+                                        : 'https://pldcreatives.vercel.app'; // Fallback for native if needed
+                                    console.log('[OAuth] Starting Google Auth with redirect:', redirectUrl);
+                                    supabase.auth.signInWithOAuth({ 
+                                        provider: 'google',
+                                        options: { redirectTo: redirectUrl }
+                                    });
+                                }}
                             >
                                 <View style={styles.socialIconPlaceholder}>
                                     <View style={[styles.googleDot, { backgroundColor: '#EA4335' }]} />
@@ -100,7 +109,13 @@ export default function LoginScreen() {
 
                             <Pressable
                                 style={[styles.socialButton, styles.appleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'apple' })}
+                                onPress={() => {
+                                    const redirectUrl = Platform.OS === 'web' ? window.location.origin : undefined;
+                                    supabase.auth.signInWithOAuth({ 
+                                        provider: 'apple',
+                                        options: { redirectTo: redirectUrl }
+                                    });
+                                }}
                             >
                                 <Mail size={20} color="white" style={styles.socialIcon} />
                                 <Text style={[styles.socialButtonText, { color: 'white' }]}>Continue with Apple</Text>

@@ -1,6 +1,7 @@
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Platform } from 'react-native';
 
 type AuthContextType = {
     session: Session | null;
@@ -113,6 +114,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         let mounted = true;
+        if (Platform.OS === 'web') {
+            console.log('[Auth Context] Current URL:', window.location.href);
+            console.log('[Auth Context] Current Hash:', window.location.hash);
+        }
 
         const handleAuthStateChange = async (currentSession: Session | null) => {
             if (!mounted) return;
