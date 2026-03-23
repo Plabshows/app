@@ -28,7 +28,7 @@ export interface Act {
 }
 
 // Static category map (avoids PostgREST join issues)
-const CATEGORY_MAP: Record<string, string> = {
+export const CATEGORY_MAP: Record<string, string> = {
     '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musician',
     'bf451e54-4edb-4453-8ff7-f74a3882e89c': 'Dancer',
     'f26b86db-2ef5-476b-bf53-3a09d4ecba17': 'Magic',

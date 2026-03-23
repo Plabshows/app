@@ -1,5 +1,5 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
-import { useActs } from '@/src/hooks/useActs';
+import { useActs, CATEGORY_MAP } from '@/src/hooks/useActs';
 import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -94,7 +94,7 @@ export default function DiscoverScreen() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*, category_data:categories(name, slug)')
+          .select('*')
           .or('role.eq.artist,role.eq.talent')
           .eq('is_published', true)
           .order('created_at', { ascending: false })
@@ -103,7 +103,7 @@ export default function DiscoverScreen() {
         if (data && data.length > 0) {
           const mapped = data.map((prof: any) => ({
             ...prof,
-            category: prof.category_data?.name || 'Artist',
+            category: (CATEGORY_MAP as any)[prof.category_id] || 'Artist',
           }));
           setNewActs(mapped);
         }
