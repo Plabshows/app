@@ -1,3 +1,4 @@
+import { OFFICIAL_CATEGORIES, CATEGORY_ICONS } from '@/src/constants/categories';
 import { COLORS } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { ActDetailData, useAct } from '@/src/hooks/useAct';
@@ -9,7 +10,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, ShieldCheck, Star, Video as VideoIcon, Zap, ChevronDown, ChevronLeft, ChevronRight, Mail, Instagram, Globe, Trash2, X, Check } from 'lucide-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler } from 'react-native-reanimated';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, ShieldCheck, Star, Video as VideoIcon, Zap, ChevronDown, ChevronLeft, ChevronRight, Mail, Instagram, Globe, Trash2, X, Check, Sparkles, Heart } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -22,11 +24,35 @@ const TABS = [
 ];
 
 export default function ActDetail() {
-    const { id } = useLocalSearchParams();
+    const { id: paramId } = useLocalSearchParams();
+    const id = (Array.isArray(paramId) ? paramId[0] : paramId) || '';
+    
+    const { user, profile, realUser, realProfile, refreshAuth } = useAuth();
     const router = useRouter();
-    const { user, profile, realProfile, realUser } = useAuth();
     const { act, loading, error, refetch } = useAct(id);
     const insets = useSafeAreaInsets();
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedData, setEditedData] = useState<any>(null);
+    const [scrolled, setScrolled] = useState(false);
+    const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos');
+    const [showInquiryModal, setShowInquiryModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+
+    const scrollY = useSharedValue(0);
+    const headerAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            opacity: interpolate(scrollY.value, [0, 150], [0, 1], Extrapolate.CLAMP),
+        };
+    });
+
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event: any) => {
+            scrollY.value = event.contentOffset.y;
+        },
+    });
 
     // Helper to convert base64 to Blob for reliable web uploads
     const base64ToBlob = (base64: string, contentType: string) => {
@@ -51,11 +77,6 @@ export default function ActDetail() {
             throw e;
         }
     };
-
-    // Edit Mode State
-    const [isEditing, setIsEditing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [editedData, setEditedData] = useState<any>(null);
 
     // Permissions check — use realProfile/realUser to ensure admins retain rights when impersonating
     const adminSource = realProfile || profile;
@@ -83,6 +104,56 @@ export default function ActDetail() {
         };
         fetchCategories();
     }, []);
+
+    useEffect(() => {
+        if (profile?.favorites && act?.id) {
+            setIsFavorite(profile.favorites.includes(act.id));
+        } else {
+            setIsFavorite(false);
+        }
+    }, [profile?.favorites, act?.id]);
+
+    const toggleFavorite = async () => {
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        const isAdd = !isFavorite;
+        const actId = act?.id;
+        
+        if (!actId) return;
+
+        try {
+            const currentFavorites = profile?.favorites || [];
+            const newFavorites = isAdd
+                ? [...currentFavorites, actId]
+                : currentFavorites.filter((fid: string) => fid !== actId);
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ favorites: newFavorites })
+                .eq('id', user.id);
+
+            if (error) throw error;
+            
+            setIsFavorite(isAdd);
+            await refreshAuth();
+            
+            Toast.show({
+                type: 'success',
+                text1: isAdd ? 'Saved to Favorites' : 'Removed from Favorites',
+                position: 'bottom'
+            });
+        } catch (err: any) {
+            console.error('[Favorites] Error:', err);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: err.message || 'Could not update favorites'
+            });
+        }
+    };
 
     useEffect(() => {
         if (act && !editedData) {
@@ -484,7 +555,7 @@ export default function ActDetail() {
                 }
 
                 console.log('Upload successful:', data);
-                const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(fileName);
+                const { data: { publicUrl } = { publicUrl: '' } } = supabase.storage.from('media').getPublicUrl(fileName);
 
                 setEditedData((prev: any) => ({
                     ...prev,
@@ -628,6 +699,20 @@ export default function ActDetail() {
                 >
                     <ArrowLeft color="#fff" size={24} />
                 </Pressable>
+
+                {/* Favorite Button */}
+                {!isEditing && profile?.role === 'client' && (
+                    <Pressable
+                        style={styles.favoriteButtonAbsolute}
+                        onPress={toggleFavorite}
+                    >
+                        <Heart 
+                            size={24} 
+                            color={isFavorite ? COLORS.primary : "#fff"} 
+                            fill={isFavorite ? COLORS.primary : "transparent"} 
+                        />
+                    </Pressable>
+                )}
 
                 {/* Performance Lab Management Badge */}
                 <View style={styles.agencyBadgeAbsolute}>
@@ -1259,6 +1344,7 @@ export default function ActDetail() {
                     <ScrollView style={styles.categoryList}>
                         {categories.map((cat) => {
                             const isSelected = editedData?.category_ids?.includes(cat.id);
+                            const IconComponent = CATEGORY_ICONS[cat.name] || Sparkles;
                             return (
                                 <Pressable 
                                     key={cat.id} 
@@ -1289,12 +1375,20 @@ export default function ActDetail() {
                                         }));
                                     }}
                                 >
-                                    <Text style={[
-                                        styles.categoryItemText,
-                                        isSelected && { color: COLORS.primary, fontWeight: 'bold' }
-                                    ]}>
-                                        {cat.name}
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={[
+                                            { width: 36, height: 36, borderRadius: 18, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' },
+                                            isSelected && { backgroundColor: COLORS.primary }
+                                        ]}>
+                                            <IconComponent size={18} color={isSelected ? '#000' : COLORS.primary} />
+                                        </View>
+                                        <Text style={[
+                                            styles.categoryItemText,
+                                            isSelected && { color: COLORS.primary, fontWeight: 'bold' }
+                                        ]}>
+                                            {cat.name}
+                                        </Text>
+                                    </View>
                                     {isSelected && <Check size={16} color={COLORS.primary} />}
                                 </Pressable>
                             );
@@ -2155,7 +2249,7 @@ const styles = StyleSheet.create({
     },
     agencyBadgeAbsolute: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 54 : 34,
+        top: Platform.OS === 'ios' ? 100 : 80,
         right: 20,
         backgroundColor: 'rgba(0,0,0,0.6)',
         paddingHorizontal: 12,
@@ -2166,6 +2260,18 @@ const styles = StyleSheet.create({
         gap: 6,
         borderWidth: 1,
         borderColor: 'rgba(204, 255, 0, 0.4)',
+    },
+    favoriteButtonAbsolute: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 30,
+        right: 20,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
     },
     agencyBadgeText: {
         color: COLORS.primary,

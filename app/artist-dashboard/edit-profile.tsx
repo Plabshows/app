@@ -1,6 +1,6 @@
 
 import * as ImagePicker from 'expo-image-picker';
-import { ChevronDown, Save, Star, User } from 'lucide-react-native';
+import { ChevronDown, Save, Star, User, Sparkles, Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import Toast from 'react-native-toast-message';
 import {
@@ -20,7 +20,8 @@ import {
 import { COLORS, SPACING } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { supabase } from '../../src/lib/supabase';
-import { APP_CATEGORIES } from '../../src/constants/categories';
+
+import { OFFICIAL_CATEGORIES, CATEGORY_ICONS } from '../../src/constants/categories';
 
 const ARTIST_TYPES = ['Solo', 'Duo', 'Trio', 'Quartet', 'Band (5+)', 'Group/Crew'];
 
@@ -28,7 +29,7 @@ export default function UnifiedEditProfile() {
     const { user, refreshAuth } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [categories, setCategories] = useState<any[]>(APP_CATEGORIES);
+    const [categories, setCategories] = useState<any[]>([]);
 
     // Unified State
     const [profileData, setProfileData] = useState({
@@ -41,7 +42,7 @@ export default function UnifiedEditProfile() {
         // From 'acts' table
         act_name: '',
         category_id: '',
-        category_ids: [] as string[],
+        categories: [] as string[],
         artist_type: '',
         genre: '',
         bio: '',
@@ -64,8 +65,9 @@ export default function UnifiedEditProfile() {
 
     const fetchData = async () => {
         try {
-            // No longer fetching categories from DB, using APP_CATEGORIES constant
-            
+            const { data: catData } = await supabase.from('categories').select('*').order('name');
+            setCategories(catData || []);
+
             if (!user) {
                 console.log('[fetchData] No user found in AuthContext');
                 return;
@@ -84,7 +86,7 @@ export default function UnifiedEditProfile() {
                 country: prof?.country || '',
                 act_name: act?.name || '',
                 category_id: act?.category_id || '',
-                category_ids: Array.isArray(act?.category_ids) ? act.category_ids : (act?.category_id ? [act.category_id] : []),
+                categories: act?.categories || (act?.category ? [act.category] : []),
                 artist_type: act?.artist_type || '',
                 genre: act?.genre || '',
                 bio: act?.description || '',
@@ -119,7 +121,7 @@ export default function UnifiedEditProfile() {
         const newErrors: string[] = [];
         if (!profileData.full_name) newErrors.push('full_name');
         if (!profileData.act_name) newErrors.push('act_name');
-        if (!profileData.category_id) newErrors.push('category_id');
+        if (!profileData.categories || profileData.categories.length === 0) newErrors.push('category_id');
         if (!profileData.artist_type) newErrors.push('artist_type');
         setErrors(newErrors);
         return newErrors.length === 0;
@@ -211,10 +213,9 @@ export default function UnifiedEditProfile() {
                     name: profileData.full_name,
                     city: profileData.city,
                     country: profileData.country,
-                    avatar_url: coverImageUrl,
-                    category_ids: profileData.category_ids,
-                    // Backward compatibility for single category apps
-                    category_id: profileData.category_ids[0] || null
+                    categories: profileData.categories,
+                    // 🎯 Avatar = cover image (first photo or existing)
+                    avatar_url: coverImageUrl
                 })
                 .eq('id', user.id)
                 .select();
@@ -236,8 +237,8 @@ export default function UnifiedEditProfile() {
             console.log(`[handleSave] Step 2: Updating acts for owner_id ${user.id}...`);
             
             const actPayload: any = {
-                category_id: profileData.category_ids[0] || null,
-                category_ids: profileData.category_ids,
+                category_id: profileData.category_id || null,
+                categories: profileData.categories,
                 artist_type: profileData.artist_type,
                 genre: profileData.genre,
                 description: profileData.bio,
@@ -376,10 +377,10 @@ export default function UnifiedEditProfile() {
                                 style={[styles.dropdown, errors.includes('category_id') && styles.inputError]}
                                 onPress={() => { setModalType('category'); setModalVisible(true); }}
                             >
-                                <Text style={[styles.dropdownText, profileData.category_ids.length === 0 && { color: COLORS.textDim }]}>
-                                    {profileData.category_ids.length > 0
-                                        ? profileData.category_ids.map(id => categories.find(c => c.id === id)?.name).filter(Boolean).join(', ')
-                                        : 'Select Talents'}
+                                <Text style={[styles.dropdownText, (!profileData.categories || profileData.categories.length === 0) && { color: COLORS.textDim }]} numberOfLines={1}>
+                                    {profileData.categories && profileData.categories.length > 0 
+                                        ? profileData.categories.join(', ') 
+                                        : 'Select Categories'}
                                 </Text>
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>
@@ -493,36 +494,63 @@ export default function UnifiedEditProfile() {
                         <View style={styles.modalContent}>
                             <Text style={styles.modalTitle}>Select {modalType === 'category' ? 'Category' : 'Type'}</Text>
                             <ScrollView>
-                                {(modalType === 'category' ? categories : ARTIST_TYPES).map((item: any) => (
-                                    <Pressable
-                                        key={modalType === 'category' ? item.id : item}
-                                        style={styles.modalItem}
-                                        onPress={() => {
-                                            if (modalType === 'category') {
-                                                const currentIds = [...profileData.category_ids];
-                                                const index = currentIds.indexOf(item.id);
-                                                if (index > -1) {
-                                                    currentIds.splice(index, 1);
+                                {(modalType === 'category' ? OFFICIAL_CATEGORIES : ARTIST_TYPES).map((item: any) => {
+                                    const itemName = modalType === 'category' ? item.name : item;
+                                    const isSelected = modalType === 'category' 
+                                        ? profileData.categories.includes(itemName)
+                                        : profileData.artist_type === itemName;
+
+                                    const IconComponent = modalType === 'category' ? (CATEGORY_ICONS[itemName] || Sparkles) : null;
+                                    return (
+                                        <Pressable
+                                            key={modalType === 'category' ? item.id : item}
+                                            style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                                            onPress={() => {
+                                                if (modalType === 'category') {
+                                                    const newCats = profileData.categories.includes(itemName)
+                                                        ? profileData.categories.filter(c => c !== itemName)
+                                                        : [...profileData.categories, itemName];
+                                                    
+                                                    // Also set category_id for backward compatibility (using the first selected)
+                                                    const firstCat = OFFICIAL_CATEGORIES.find(c => c.name === newCats[0]);
+                                                    
+                                                    setProfileData({ 
+                                                        ...profileData, 
+                                                        categories: newCats,
+                                                        category_id: firstCat?.id || profileData.category_id
+                                                    });
                                                 } else {
-                                                    currentIds.push(item.id);
+                                                    setProfileData({ ...profileData, artist_type: itemName });
+                                                    setModalVisible(false);
                                                 }
-                                                setProfileData({ ...profileData, category_ids: currentIds });
-                                            } else {
-                                                setProfileData({ ...profileData, artist_type: item });
-                                                setModalVisible(false);
-                                            }
-                                        }}
-                                    >
-                                        <Text style={[
-                                            styles.modalItemText,
-                                            modalType === 'category' && profileData.category_ids.includes(item.id) && { color: COLORS.primary, fontWeight: 'bold' }
-                                        ]}>
-                                            {modalType === 'category' ? item.name : item}
-                                            {modalType === 'category' && profileData.category_ids.includes(item.id) && " ✓"}
-                                        </Text>
-                                    </Pressable>
-                                ))}
+                                            }}
+                                        >
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                    {IconComponent && (
+                                                        <View style={[
+                                                            { width: 32, height: 32, borderRadius: 16, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' },
+                                                            isSelected && { backgroundColor: COLORS.primary }
+                                                        ]}>
+                                                            <IconComponent size={16} color={isSelected ? '#000' : COLORS.primary} />
+                                                        </View>
+                                                    )}
+                                                    <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>{itemName}</Text>
+                                                </View>
+                                                {isSelected && <Check size={16} color={COLORS.primary} />}
+                                            </View>
+                                        </Pressable>
+                                    );
+                                })}
                             </ScrollView>
+                            {modalType === 'category' && (
+                                <Pressable 
+                                    style={styles.closeModalButton} 
+                                    onPress={() => setModalVisible(false)}
+                                >
+                                    <Text style={styles.closeModalButtonText}>Done</Text>
+                                </Pressable>
+                            )}
                         </View>
                     </Pressable>
                 </Modal>
@@ -573,7 +601,17 @@ const styles = StyleSheet.create({
     modalContent: { backgroundColor: '#1A1A1A', borderRadius: 20, maxHeight: '70%', padding: 24, borderWidth: 1, borderColor: '#333' },
     modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     modalItem: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#222' },
-    modalItemText: { color: COLORS.text, fontSize: 17, textAlign: 'center' },
+    modalItemActive: { backgroundColor: 'rgba(212, 175, 55, 0.05)' },
+    modalItemText: { color: COLORS.text, fontSize: 17, textAlign: 'left' },
+    modalItemTextActive: { color: COLORS.primary, fontWeight: 'bold' },
+    closeModalButton: {
+        backgroundColor: COLORS.primary,
+        padding: 14,
+        borderRadius: 10,
+        marginTop: 20,
+        alignItems: 'center'
+    },
+    closeModalButtonText: { color: COLORS.background, fontWeight: 'bold', fontSize: 16 },
 
     imagePicker: {
         width: '100%',

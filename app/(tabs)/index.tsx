@@ -1,45 +1,52 @@
+import { OFFICIAL_CATEGORIES, CATEGORY_ICONS } from '@/src/constants/categories';
 import { COLORS, SPACING } from '@/src/constants/theme';
+import { useAuth } from '@/src/context/AuthContext';
+import { AuthGate } from '@/src/components/auth/AuthGate';
 import { useActs } from '@/src/hooks/useActs';
 import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { APP_CATEGORIES, CATEGORY_ICONS, CATEGORY_MAP } from '@/src/constants/categories';
-import {
-  Award,
-  CheckCircle,
-  Ghost,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Star
-} from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  ImageBackground,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from 'react-native';
+import { Search, Sparkles, ShieldCheck, CheckCircle, Award, Ghost, Star } from 'lucide-react-native';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { ActivityIndicator, Animated, Dimensions, FlatList, Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-const TOP_CATEGORIES = APP_CATEGORIES;
-const BOTTOM_CATEGORIES = APP_CATEGORIES.map(c => c.name);
+const TOP_CATEGORIES = OFFICIAL_CATEGORIES;
+const BOTTOM_CATEGORIES = OFFICIAL_CATEGORIES.map(c => c.name);
+
+const CATEGORY_MAP = {
+    '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',
+    'bf451e54-4edb-4453-8ff7-f74a3882e89c': 'Dancers',
+    'f26b86db-2ef5-476b-bf53-3a09d4ecba17': 'Magic',
+    '42f050db-aa72-4a8f-97ba-8521b4c1ec03': 'Roaming',
+    '95585a4e-1cc1-417e-a064-7f210b9c2996': 'Fire & Flow',
+    '6e2eba1a-54ee-4360-95b1-932089633089': 'Circus',
+    'bff4df18-b95f-4f7e-821b-ab303b030c9a': 'DJ',
+    '7dc05cb1-fa8a-4317-9c17-d2682831d73c': 'Specialty Acts',
+    '0ca60f4f-2c8b-421c-9711-88f1e9327cb8': 'Singer',
+    '8a662c88-7702-4ec7-bd70-671d707a0774': 'Art',
+    '95a06893-94ff-4500-9fbf-b32efce7026f': 'Actors',
+    '6a48f266-d4a5-4e8b-babe-e58fb204645d': 'Drags',
+    '347f8d09-522b-44a7-8453-3950f907ce9f': 'Water Acts',
+};
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const { acts, loading, refetch } = useActs();
   const [newActs, setNewActs] = useState<any[]>([]);
+
+  // --- Internal State ---
+  const [scrolled, setScrolled] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // --- FETCH NEWEST ARTISTS ---
   useEffect(() => {

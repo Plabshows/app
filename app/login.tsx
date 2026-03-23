@@ -53,7 +53,8 @@ export default function LoginScreen() {
             } else if (profile?.is_admin) {
                 router.replace('/admin' as any);
             } else {
-                router.replace('/artist-dashboard' as any);
+                // Both artists and clients land on /profile — it renders differently per role
+                router.replace('/(tabs)/profile' as any);
             }
         } catch (error: any) {
             setErrorMsg(error.message);

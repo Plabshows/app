@@ -4,10 +4,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { OFFICIAL_CATEGORIES } from '@/src/constants/categories';
 
-import { APP_CATEGORIES } from '@/src/constants/categories';
-
-const CATEGORIES = ['All', ...APP_CATEGORIES.map(c => c.name)];
+const CATEGORIES = ['All', ...OFFICIAL_CATEGORIES.map(c => c.name)];
 
 import { Act } from '@/src/hooks/useActs';
 
@@ -76,7 +75,7 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Marketplace</Text>
+        <Text style={styles.headerTitle}>Performance Lab</Text>
       </View>
 
       <View style={styles.searchContainer}>

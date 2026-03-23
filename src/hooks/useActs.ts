@@ -29,8 +29,22 @@ export interface Act {
     packages?: { name: string; price: string; duration: string; description: string }[];
 }
 
-import { CATEGORY_MAP } from '../constants/categories';
-export { CATEGORY_MAP };
+// Static category map (avoids PostgREST join issues)
+export const CATEGORY_MAP: Record<string, string> = {
+    '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',
+    'bf451e54-4edb-4453-8ff7-f74a3882e89c': 'Dancers',
+    'f26b86db-2ef5-476b-bf53-3a09d4ecba17': 'Magic',
+    '42f050db-aa72-4a8f-97ba-8521b4c1ec03': 'Roaming',
+    '95585a4e-1cc1-417e-a064-7f210b9c2996': 'Fire & Flow',
+    '6e2eba1a-54ee-4360-95b1-932089633089': 'Circus',
+    'bff4df18-b95f-4f7e-821b-ab303b030c9a': 'DJ',
+    '7dc05cb1-fa8a-4317-9c17-d2682831d73c': 'Specialty Acts',
+    '0ca60f4f-2c8b-421c-9711-88f1e9327cb8': 'Singer',
+    '8a662c88-7702-4ec7-bd70-671d707a0774': 'Art',
+    '347f8d09-522b-44a7-8453-3950f907ce9f': 'Water Acts',
+    '95a06893-94ff-4500-9fbf-b32efce7026f': 'Actors',
+    '6a48f266-d4a5-4e8b-babe-e58fb204645d': 'Drags',
+};
 
 export function useActs() {
     const [acts, setActs] = useState<Act[]>([]);

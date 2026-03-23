@@ -57,6 +57,7 @@ function RootLayoutNav() {
     const effectiveProfile = realProfile || profile;
 
     const inAuthGroup = segments[0] as string === 'login' || segments[0] as string === 'signup';
+    const inTabsGroup = segments[0] as string === '(tabs)';
 
     console.log('[Auth Guard]', {
       segments,
@@ -69,21 +70,23 @@ function RootLayoutNav() {
     // If impersonating, we generally want to stay where we are (e.g., in the artist dashboard)
     if (isImpersonating) return;
 
-    // Only redirect if user is logged in but tries to access login/signup pages
-    if (!loading && effectiveUser && inAuthGroup) {
-      console.log('Middleware: Usuario detectado:', effectiveUser.email);
-      console.log('Middleware: is_admin:', effectiveProfile?.is_admin);
+    if (!loading && effectiveUser) {
+      const isAdmin = effectiveProfile?.is_admin || effectiveUser.email === 'hizesupremos@gmail.com';
+      const isArtist = effectiveProfile?.role === 'artist';
+      const isClient = effectiveProfile?.role === 'client';
 
-      if (effectiveProfile?.is_admin || effectiveUser.email === 'hizesupremos@gmail.com') {
-        console.log('[Auth Guard] Redirecting admin to /admin');
-        router.replace('/admin' as any);
-      } else if (effectiveProfile?.role === 'artist') {
-        console.log('[Auth Guard] Redirecting artist to /artist-dashboard');
-        router.replace('/artist-dashboard' as any);
-      } else {
-        console.log('[Auth Guard] Redirecting authenticated user to /(tabs)/profile');
-        router.replace('/(tabs)/profile');
+      // Redirect from auth pages to the correct destination
+      if (inAuthGroup) {
+        if (isAdmin) {
+          router.replace('/admin' as any);
+        } else {
+          // Both artists and clients go to /profile — it renders per role
+          router.replace('/(tabs)/profile' as any);
+        }
       }
+
+      // Artists redirect from auth pages to their dashboard
+      // Clients can freely browse /(tabs) to discover artists
     } else if (!loading && !effectiveUser && segments[0] === 'admin') {
       console.log('Middleware: Intento de acceso a /admin SIN SESIÓN');
       router.replace('/login');
@@ -100,6 +103,7 @@ function RootLayoutNav() {
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="artist-onboarding/index" options={{ headerShown: false, title: 'Join as Artist' }} />
         <Stack.Screen name="artist-dashboard" options={{ headerShown: false }} />
+        <Stack.Screen name="client-dashboard" options={{ headerShown: false }} />
         <Stack.Screen name="act/[id]" options={{ presentation: 'card', headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>

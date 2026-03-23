@@ -1,9 +1,10 @@
 import { useRouter, useSegments } from 'expo-router';
-import { Bell, Calendar, MessageCircle, User as UserIcon, Users } from 'lucide-react-native';
+import { Bell, Calendar, Heart, MessageCircle, User as UserIcon, Users } from 'lucide-react-native';
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 const TABS = [
     { name: 'index', label: 'Artists', icon: Users, path: '/(tabs)' },
@@ -17,23 +18,31 @@ export default function PersistentBottomNav() {
     const router = useRouter();
     const segments = useSegments();
     const insets = useSafeAreaInsets();
+    const { profile } = useAuth();
+    const isClient = profile?.role === 'client';
 
     // Check if we should hide the nav
     // Hide on admin routes, auth routes, and onboarding
-    const hideOnRoutes = ['admin', 'login', 'signup', 'artist-onboarding', 'artist-dashboard'];
+    const hideOnRoutes = ['admin', 'login', 'signup', 'artist-onboarding', 'artist-dashboard', 'client-dashboard'];
     const currentSegment = segments[0] as string;
 
     // Also check for act detail or other specific screens if needed
     // But the requirement is to SHOW it on act details.
 
+    // Determine active tab
+    const activeTab = segments[0] === '(tabs)' ? segments[1] || 'index' : null;
+
+    const tabsToRender = React.useMemo(() => {
+        if (!isClient) return TABS;
+        const newTabs = [...TABS];
+        // Insert Favorites after Artists (index 0)
+        newTabs.splice(1, 0, { name: 'favorites', label: 'Favorites', icon: Heart, path: '/(tabs)/favorites' });
+        return newTabs;
+    }, [isClient]);
+
     if (hideOnRoutes.includes(currentSegment)) {
         return null;
     }
-
-    // Determine active tab
-    // If in (tabs), match the segment. If outside (like act/[id]), might need smarter logic
-    // Usually (tabs) is segments[0], and the specific tab is segments[1]
-    const activeTab = segments[0] === '(tabs)' ? segments[1] || 'index' : null;
 
     return (
         <View style={[
@@ -43,7 +52,7 @@ export default function PersistentBottomNav() {
                 height: Platform.OS === 'ios' ? 88 : 68
             }
         ]}>
-            {TABS.map((tab) => {
+            {tabsToRender.map((tab) => {
                 const isActive = activeTab === tab.name;
                 const Icon = tab.icon;
 

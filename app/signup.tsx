@@ -1,7 +1,7 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Lock, Mail, User, UserPlus } from 'lucide-react-native';
+import { AlertCircle, Lock, Mail, User, UserPlus, Users } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function SignupScreen() {
     const { redirectTo, linkRequestId, emailHint } = useLocalSearchParams();
     const router = useRouter();
+    const [step, setStep] = useState(1);
+    const [role, setRole] = useState<'artist' | 'client'>(linkRequestId ? 'client' : 'artist');
     const [email, setEmail] = useState((emailHint as string) || '');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,7 +20,9 @@ export default function SignupScreen() {
 
     const handleSignup = async () => {
         setErrorMsg('');
-        if (!email || !password || !confirmPassword || (!linkRequestId && !artistName)) {
+        
+        // Validation for step 2
+        if (!email || !password || !confirmPassword || (role === 'artist' && !artistName)) {
             setErrorMsg('Please fill in all fields.');
             return;
         }
@@ -39,9 +43,8 @@ export default function SignupScreen() {
             if (!user) throw new Error('No user data returned.');
 
             if (session) {
-                const isClient = !!linkRequestId;
-                const role = isClient ? 'client' : 'artist';
-                const name = isClient ? email.split('@')[0] : artistName;
+                const isClient = role === 'client';
+                const name = isClient ? (artistName || email.split('@')[0]) : artistName;
 
                 // Create Profile
                 const { error: profileError } = await supabase
@@ -79,7 +82,8 @@ export default function SignupScreen() {
                     // @ts-ignore
                     router.replace(redirectTo as any);
                 } else {
-                    router.replace(isClient ? '/(tabs)/bookings' : '/artist-dashboard');
+                    // Profile page renders differently per role (artist vs client)
+                    router.replace('/(tabs)/profile' as any);
                 }
             } else {
                 const confirmMsg = 'Account created! Please check your email to confirm before logging in.';
@@ -96,6 +100,62 @@ export default function SignupScreen() {
         }
     };
 
+    if (step === 1) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <View style={styles.header}>
+                        <View style={styles.iconCircle}>
+                            <UserPlus size={40} color={COLORS.primary} />
+                        </View>
+                        <Text style={styles.title}>Join Performrs</Text>
+                        <Text style={styles.subtitle}>Choose how you want to use the platform</Text>
+                    </View>
+
+                    <View style={styles.roleGrid}>
+                        <Pressable 
+                            style={[styles.roleCard, role === 'client' && styles.roleCardActive]}
+                            onPress={() => setRole('client')}
+                        >
+                            <View style={[styles.roleIcon, role === 'client' && styles.roleIconActive]}>
+                                <User size={32} color={role === 'client' ? COLORS.background : COLORS.primary} />
+                            </View>
+                            <Text style={styles.roleTitle}>I am a Client</Text>
+                            <Text style={styles.roleDesc}>I want to discover and book amazing talent for my events.</Text>
+                        </Pressable>
+
+                        <Pressable 
+                            style={[styles.roleCard, role === 'artist' && styles.roleCardActive]}
+                            onPress={() => setRole('artist')}
+                        >
+                            <View style={[styles.roleIcon, role === 'artist' && styles.roleIconActive]}>
+                                <Users size={32} color={role === 'artist' ? COLORS.background : COLORS.primary} />
+                            </View>
+                            <Text style={styles.roleTitle}>I am an Artist</Text>
+                            <Text style={styles.roleDesc}>I want to showcase my talent and manage my bookings.</Text>
+                        </Pressable>
+                    </View>
+
+                    <Pressable
+                        style={styles.signupButton}
+                        onPress={() => setStep(2)}
+                    >
+                        <Text style={styles.signupButtonText}>Continue</Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={styles.loginLink}
+                        onPress={() => router.push('/login')}
+                    >
+                        <Text style={styles.loginLinkText}>
+                            Already have an account? <Text style={styles.loginLinkHighlight}>Log In</Text>
+                        </Text>
+                    </Pressable>
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
@@ -104,11 +164,13 @@ export default function SignupScreen() {
             >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
-                        <View style={styles.iconCircle}>
-                            <UserPlus size={40} color={COLORS.primary} />
-                        </View>
-                        <Text style={styles.title}>Create Account</Text>
-                        <Text style={styles.subtitle}>Start your artist journey today</Text>
+                        <Pressable style={styles.backBtn} onPress={() => setStep(1)}>
+                            <Text style={styles.backBtnText}>← Change Role</Text>
+                        </Pressable>
+                        <Text style={styles.title}>{role === 'artist' ? 'Artist Signup' : 'Client Signup'}</Text>
+                        <Text style={styles.subtitle}>
+                            {role === 'artist' ? 'Register your act and start growing' : 'Create an account to book artists'}
+                        </Text>
                     </View>
 
                     <View style={styles.form}>
@@ -123,7 +185,7 @@ export default function SignupScreen() {
                         <View style={styles.socialContainer}>
                             <Pressable
                                 style={[styles.socialButton, styles.googleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { queryParams: { role } } })}
                             >
                                 <View style={styles.socialIconPlaceholder}>
                                     <View style={[styles.googleDot, { backgroundColor: '#EA4335' }]} />
@@ -132,14 +194,6 @@ export default function SignupScreen() {
                                     <View style={[styles.googleDot, { backgroundColor: '#34A853' }]} />
                                 </View>
                                 <Text style={styles.socialButtonText}>Continue with Google</Text>
-                            </Pressable>
-
-                            <Pressable
-                                style={[styles.socialButton, styles.appleButton]}
-                                onPress={() => supabase.auth.signInWithOAuth({ provider: 'apple' })}
-                            >
-                                <Mail size={20} color="white" style={styles.socialIcon} />
-                                <Text style={[styles.socialButtonText, { color: 'white' }]}>Continue with Apple</Text>
                             </Pressable>
                         </View>
 
@@ -150,12 +204,12 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Artist Name</Text>
+                            <Text style={styles.label}>{role === 'artist' ? 'Artist/Act Name' : 'Full Name'}</Text>
                             <View style={styles.inputWrapper}>
                                 <User size={20} color={COLORS.textDim} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="e.g. Luna Fire Trio"
+                                    placeholder={role === 'artist' ? "e.g. Luna Fire Trio" : "Your name"}
                                     placeholderTextColor={COLORS.textDim}
                                     value={artistName}
                                     onChangeText={setArtistName}
@@ -169,7 +223,7 @@ export default function SignupScreen() {
                                 <Mail size={20} color={COLORS.textDim} style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="artist@example.com"
+                                    placeholder="your@email.com"
                                     placeholderTextColor={COLORS.textDim}
                                     value={email}
                                     onChangeText={setEmail}
@@ -220,10 +274,10 @@ export default function SignupScreen() {
                             {loading ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <ActivityIndicator color={COLORS.background} style={{ marginRight: 10 }} />
-                                    <Text style={styles.signupButtonText}>Creando cuenta...</Text>
+                                    <Text style={styles.signupButtonText}>Creating account...</Text>
                                 </View>
                             ) : (
-                                <Text style={styles.signupButtonText}>Sign Up</Text>
+                                <Text style={styles.signupButtonText}>Create Account</Text>
                             )}
                         </Pressable>
 
@@ -323,5 +377,54 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    roleGrid: {
+        flexDirection: 'row',
+        gap: 16,
+        marginBottom: 30,
+    },
+    roleCard: {
+        flex: 1,
+        backgroundColor: '#1A1A1A',
+        padding: 20,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#333',
+        alignItems: 'center',
+        gap: 12,
+    },
+    roleCardActive: {
+        borderColor: COLORS.primary,
+        backgroundColor: 'rgba(204, 255, 0, 0.05)',
+    },
+    roleIcon: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(204, 255, 0, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    roleIconActive: {
+        backgroundColor: COLORS.primary,
+    },
+    roleTitle: {
+        color: COLORS.text,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    roleDesc: {
+        color: COLORS.textDim,
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 18,
+    },
+    backBtn: {
+        alignSelf: 'flex-start',
+        marginBottom: 20,
+    },
+    backBtnText: {
+        color: COLORS.primary,
+        fontWeight: '600',
     },
 });

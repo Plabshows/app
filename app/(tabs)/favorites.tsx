@@ -1,0 +1,193 @@
+import { COLORS, SPACING } from '@/src/constants/theme';
+import { supabase } from '@/src/lib/supabase';
+import { useAuth } from '@/src/context/AuthContext';
+import { useRouter } from 'expo-router';
+import { Heart, Search, User } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Pressable,
+    StyleSheet,
+    Text,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+export default function FavoritesScreen() {
+    const { profile, loading: authLoading } = useAuth();
+    const [favorites, setFavorites] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (profile?.favorites && profile.favorites.length > 0) {
+            fetchFavoriteArtists();
+        } else {
+            setLoading(false);
+        }
+    }, [profile?.favorites]);
+
+    async function fetchFavoriteArtists() {
+        try {
+            const { data, error } = await supabase
+                .from('acts')
+                .select('*')
+                .in('owner_id', profile.favorites);
+
+            if (error) throw error;
+            setFavorites(data || []);
+        } catch (err) {
+            console.error('Error fetching favorites:', err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    if (loading || authLoading) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator color={COLORS.primary} size="large" />
+            </View>
+        );
+    }
+
+    if (!profile?.favorites || profile.favorites.length === 0) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Favorites</Text>
+                </View>
+                <View style={styles.emptyState}>
+                    <Heart size={64} color="#333" />
+                    <Text style={styles.emptyTitle}>No favorites yet</Text>
+                    <Text style={styles.emptyText}>
+                        Start exploring artists and save your favorites to see them here.
+                    </Text>
+                    <Pressable 
+                        style={styles.exploreBtn} 
+                        onPress={() => router.push('/(tabs)')}
+                    >
+                        <Text style={styles.exploreBtnText}>Explore Artists</Text>
+                    </Pressable>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.title}>My Favorites</Text>
+                <Text style={styles.subtitle}>{favorites.length} artists saved</Text>
+            </View>
+
+            <FlatList
+                data={favorites}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.list}
+                renderItem={({ item }) => (
+                    <Pressable 
+                        style={styles.artistCard}
+                        onPress={() => router.push(`/act/${item.id}`)}
+                    >
+                        <Image 
+                            source={{ uri: item.image_url || 'https://via.placeholder.com/150' }} 
+                            style={styles.artistImage} 
+                        />
+                        <View style={styles.artistInfo}>
+                            <Text style={styles.artistName}>{item.name}</Text>
+                            <Text style={styles.artistCategory}>{item.category || 'Artist'}</Text>
+                            <View style={styles.priceRow}>
+                                <Text style={styles.priceText}>{item.price_guide || 'Contact for price'}</Text>
+                            </View>
+                        </View>
+                        <Heart size={20} color={COLORS.primary} fill={COLORS.primary} />
+                    </Pressable>
+                )}
+            />
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: COLORS.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+    header: { padding: SPACING.l, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' },
+    title: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
+    subtitle: { fontSize: 14, color: COLORS.textDim, marginTop: 4 },
+    
+    list: { padding: SPACING.l },
+    artistCard: {
+        flexDirection: 'row',
+        backgroundColor: '#111',
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#222',
+    },
+    artistImage: {
+        width: 70,
+        height: 70,
+        borderRadius: 12,
+        backgroundColor: '#222',
+    },
+    artistInfo: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    artistName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        marginBottom: 4,
+    },
+    artistCategory: {
+        fontSize: 14,
+        color: COLORS.primary,
+        marginBottom: 4,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    priceText: {
+        fontSize: 13,
+        color: COLORS.textDim,
+    },
+
+    emptyState: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: COLORS.text,
+        marginTop: 20,
+        marginBottom: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: COLORS.textDim,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 30,
+    },
+    exploreBtn: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: 14,
+        paddingHorizontal: 30,
+        borderRadius: 30,
+    },
+    exploreBtnText: {
+        color: '#000',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+});

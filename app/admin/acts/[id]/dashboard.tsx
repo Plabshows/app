@@ -23,7 +23,6 @@ import { COLORS } from '../../../../src/constants/theme';
 import { useAuth } from '../../../../src/context/AuthContext';
 import { logAdminAction } from '../../../../src/lib/audit';
 import { supabase } from '../../../../src/lib/supabase';
-import { APP_CATEGORIES } from '../../../../src/constants/categories';
 
 const ARTIST_TYPES = ['Solo', 'Duo', 'Trio', 'Quartet', 'Band (5+)', 'Group/Crew'];
 
@@ -34,7 +33,7 @@ export default function AdminManageAct() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [categories, setCategories] = useState<any[]>(APP_CATEGORIES);
+    const [categories, setCategories] = useState<any[]>([]);
 
     // Unified State
     const [profileData, setProfileData] = useState({
@@ -52,11 +51,16 @@ export default function AdminManageAct() {
         is_verified: false,
         is_published: false,
         is_public: false,
-        act_is_published: false,
-        category_ids: [] as string[]
+        act_is_published: false
     });
 
     const [modalVisible, setModalVisible] = useState(false);
+    const [activeTab, setActiveTab] = useState<'info' | 'photos' | 'videos'>('info');
+    const [isEditingBasic, setIsEditingBasic] = useState(false);
+    const [isEditingBio, setIsEditingBio] = useState(false);
+    const [isEditingCategories, setIsEditingCategories] = useState(false);
+    const [isEditingSocials, setIsEditingSocials] = useState(false);
+    const [newSocialLink, setNewSocialLink] = useState('');
     const [modalType, setModalType] = useState<'category' | 'type'>('category');
     const [errors, setErrors] = useState<string[]>([]);
 
@@ -100,7 +104,9 @@ export default function AdminManageAct() {
 
     const fetchData = async () => {
         try {
-            // No longer fetching categories from DB, using APP_CATEGORIES constant
+            const { data: catData } = await supabase.from('categories').select('*').order('name');
+            setCategories(catData || []);
+
             if (!targetUserId) return;
 
             // Fetch Profile
@@ -124,8 +130,7 @@ export default function AdminManageAct() {
                 is_verified: prof?.is_verified || false,
                 is_published: prof?.is_published || false,
                 is_public: prof?.is_public || false,
-                act_is_published: act?.is_published || false,
-                category_ids: Array.isArray(act?.category_ids) ? act.category_ids : (act?.category_id ? [act.category_id] : [])
+                act_is_published: act?.is_published || false
             });
 
             const photos = Array.isArray(act?.photos_url) ? act.photos_url : [];
@@ -296,10 +301,7 @@ export default function AdminManageAct() {
                 avatar_url: coverImageUrl,
                 is_verified: profileData.is_verified,
                 is_published: profileData.is_published,
-                is_public: profileData.is_public,
-                category_ids: profileData.category_ids,
-                // Backward compatibility
-                category_id: profileData.category_ids[0] || null
+                is_public: profileData.is_public
             }).eq('id', targetUserId).select();
 
             console.log(`[AdminSave] Profile update result:`, { updatedProfile, profError });
@@ -314,8 +316,7 @@ export default function AdminManageAct() {
             
             // Build act payload dynamically to omit 'name' if it's unchanged
             const actPayload: any = {
-                category_id: profileData.category_ids[0] || null,
-                category_ids: profileData.category_ids,
+                category_id: profileData.category_id || null,
                 artist_type: profileData.artist_type,
                 genre: profileData.genre,
                 description: profileData.bio,
@@ -492,10 +493,8 @@ export default function AdminManageAct() {
                                 style={[styles.dropdown, errors.includes('category_id') && styles.inputError]}
                                 onPress={() => { setModalType('category'); setModalVisible(true); }}
                             >
-                                <Text style={[styles.dropdownText, profileData.category_ids.length === 0 && { color: COLORS.textDim }]}>
-                                    {profileData.category_ids.length > 0
-                                        ? profileData.category_ids.map(id => categories.find(c => c.id === id)?.name).filter(Boolean).join(', ')
-                                        : 'Select Talents'}
+                                <Text style={[styles.dropdownText, !profileData.category_id && { color: COLORS.textDim }]}>
+                                    {categories.find(c => c.id === profileData.category_id)?.name || 'Select'}
                                 </Text>
                                 <ChevronDown size={16} color={COLORS.textDim} />
                             </Pressable>
