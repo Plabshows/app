@@ -668,7 +668,7 @@ export default function AdminDashboard() {
                 <Text style={styles.cardCategory}>Client: {item.client_name}</Text>
                 <Text style={styles.cardDate}>Event Date: {item.event_date}</Text>
                 <Text style={[styles.cardDate, { color: COLORS.primary, marginTop: 4, fontWeight: 'bold' }]}>
-                    Total: {item.total_amount} AED
+                    Total: €{item.total_amount?.toLocaleString()}
                 </Text>
             </View>
             <Pressable

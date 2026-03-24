@@ -514,7 +514,7 @@ export default function AdminManageAct() {
                     </View>
 
                     <View style={styles.field}>
-                        <Text style={styles.label}>Base Net Fee (AED)</Text>
+                        <Text style={styles.label}>Base Net Fee (€)</Text>
                         <TextInput
                             style={styles.input}
                             value={String(profileData.price_guide)}

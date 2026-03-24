@@ -343,7 +343,7 @@ export default function AdminRequestDetail() {
                     )}
 
                     <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Financials (AED)</Text>
+                        <Text style={styles.sectionTitle}>Financials (€)</Text>
                         <View style={styles.priceRow}>
                             <Text style={styles.priceLabel}>Artist Fee</Text>
                             <Text style={styles.priceValue}>{request.artist_fee?.toLocaleString()}</Text>
@@ -354,7 +354,7 @@ export default function AdminRequestDetail() {
                         </View>
                         <View style={[styles.priceRow, styles.totalRow]}>
                             <Text style={styles.totalLabel}>Grand Total</Text>
-                            <Text style={styles.totalValue}>{request.total_amount?.toLocaleString()}</Text>
+                            <Text style={styles.totalValue}>€{request.total_amount?.toLocaleString()}</Text>
                         </View>
                     </View>
 
