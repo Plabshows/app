@@ -142,7 +142,10 @@ export default function BookingsScreen() {
                 <View style={styles.cardFooter}>
                     <Text style={styles.price}>AED {item.quote_price?.toLocaleString() || '---'}</Text>
                     <View style={styles.actions}>
-                        <Pressable style={styles.actionButton}>
+                        <Pressable 
+                            style={styles.actionButton}
+                            onPress={() => router.push('/(tabs)/messages')}
+                        >
                             <MessageSquare size={18} color={COLORS.text} />
                         </Pressable>
                         <Pressable style={styles.actionButton}>

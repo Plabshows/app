@@ -30,6 +30,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: true,
         storageKey: 'plabshows-auth-token',
         flowType: 'pkce',
+        // ✨ Fix: Provide a dummy lock implementation to prevent Navigator Lock timeouts in local dev
+        // This is a safe and reliable workaround for the common "lock timed out" error on Web/Localhost.
+        lock: async (_name, _acquireTimeout, fn) => {
+            return await fn();
+        }
     },
 });
 

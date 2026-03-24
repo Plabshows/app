@@ -2,7 +2,7 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { useRouter } from 'expo-router';
-import { Bell, LogOut, Shield } from 'lucide-react-native';
+import { LogOut, MessageSquare, Shield } from 'lucide-react-native';
 import React from 'react';
 import {
     Alert,
@@ -41,7 +41,7 @@ export default function SettingsSection() {
             <View style={styles.section}>
                 <Text style={styles.sectionHeader}>Notifications</Text>
                 <View style={styles.item}>
-                    <Bell size={20} color={COLORS.textDim} />
+                    <MessageSquare size={20} color={COLORS.textDim} />
                     <View style={styles.itemContent}>
                         <Text style={styles.itemTitle}>Booking Inquiries</Text>
                         <Text style={styles.itemSubtitle}>Receive emails for new bookings</Text>

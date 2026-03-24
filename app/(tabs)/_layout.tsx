@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from 'expo-router';
-import { Bell, Calendar, MessageCircle, User, Users } from 'lucide-react-native';
+import { Calendar, Heart, MessageCircle, User, Users } from 'lucide-react-native';
 import React from 'react';
 
 import { COLORS } from '../../src/constants/theme';
@@ -33,6 +33,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'Favorites',
+          tabBarIcon: ({ color, size }) => <Heart size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="bookings"
         options={{
           title: 'Bookings',
@@ -46,13 +53,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Notifications',
-          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} />,
-        }}
-      />
+
       <Tabs.Screen
         name="profile"
         options={{

@@ -1,45 +1,56 @@
 import { COLORS } from '@/src/constants/theme';
 import { HelpCircle, MessageSquare } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
+    SafeAreaView
 } from 'react-native';
 
 export default function HelpScreen() {
-    return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Help & Support</Text>
-                <Text style={styles.subtitle}>We're here to help you succeed on the platform.</Text>
-            </View>
+    const router = useRouter();
 
-            <View style={styles.grid}>
-                <HelpCard
-                    title="Knowledge Base"
-                    desc="Read our guide on how to create a profile that gets booked."
-                    icon={HelpCircle}
-                />
-                <HelpCard
-                    title="Live Chat"
-                    desc="Talk to our artist support team."
-                    icon={MessageSquare}
-                    primary
-                />
-            </View>
-        </ScrollView>
+    return (
+        <SafeAreaView style={styles.container}>
+            <ScrollView contentContainerStyle={styles.content}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Help & Support</Text>
+                    <Text style={styles.subtitle}>We're here to help you succeed on the platform.</Text>
+                </View>
+
+                <View style={styles.grid}>
+                    <HelpCard
+                        title="Knowledge Base"
+                        desc="Read our guide on how to create a profile that gets booked."
+                        icon={HelpCircle}
+                        onPress={() => {}}
+                    />
+                    <HelpCard
+                        title="Live Chat"
+                        desc="Talk to our artist support team."
+                        icon={MessageSquare}
+                        primary
+                        onPress={() => router.push('/(tabs)/messages' as any)}
+                    />
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
-const HelpCard = ({ title, desc, icon: Icon, primary }: any) => (
+const HelpCard = ({ title, desc, icon: Icon, primary, onPress }: any) => (
     <View style={[styles.card, primary && { borderColor: COLORS.primary + '66' }]}>
         <Icon size={32} color={primary ? COLORS.primary : COLORS.textDim} style={{ marginBottom: 16 }} />
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={styles.cardDesc}>{desc}</Text>
-        <Pressable style={[styles.cardButton, primary && { backgroundColor: COLORS.primary }]}>
+        <Pressable 
+            onPress={onPress}
+            style={[styles.cardButton, primary && { backgroundColor: COLORS.primary }]}
+        >
             <Text style={[styles.cardButtonText, primary && { color: COLORS.background }]}>Open</Text>
         </Pressable>
     </View>
@@ -64,5 +75,21 @@ const styles = StyleSheet.create({
     cardTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 },
     cardDesc: { fontSize: 14, color: COLORS.textDim, marginBottom: 20, lineHeight: 20 },
     cardButton: { backgroundColor: '#222', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-    cardButtonText: { color: COLORS.text, fontWeight: 'bold' }
+    cardButtonText: { color: COLORS.text, fontWeight: 'bold' },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#1A1A1A'
+    },
+    closeButton: {
+        padding: 8,
+    },
+    modalTitle: {
+        color: COLORS.text,
+        fontSize: 18,
+        fontWeight: 'bold'
+    }
 });

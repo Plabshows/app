@@ -2,9 +2,9 @@ import { COLORS } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/context/AuthContext';
 import { useRouter } from 'expo-router';
-import { Calendar, ChevronRight, Clock, ExternalLink, Heart, MapPin, MessageCircle, Send } from 'lucide-react-native';
+import { Calendar, ChevronRight, Clock, ExternalLink, Heart, MapPin, MessageCircle, Send, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
     pending:  { color: '#F59E0B', label: 'Pending' },
@@ -33,6 +33,34 @@ export default function RequestsPage() {
         setRequests(data || []);
         setLoading(false);
     }, [profile?.id]);
+
+    const deleteRequest = async (requestId: string) => {
+        Alert.alert(
+            'Cancel Request',
+            'Are you sure you want to cancel and delete this booking request?',
+            [
+                { text: 'No', style: 'cancel' },
+                {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('booking_requests')
+                                .delete()
+                                .eq('id', requestId);
+                            
+                            if (error) throw error;
+                            
+                            setRequests(prev => prev.filter(r => r.id !== requestId));
+                        } catch (err: any) {
+                            Alert.alert('Error', err.message);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     useEffect(() => { load(); }, [load]);
 
@@ -121,9 +149,12 @@ export default function RequestsPage() {
                                         <ExternalLink size={14} color="#9CA3AF" />
                                         <Text style={styles.viewActBtnText}>View Artist</Text>
                                     </Pressable>
-                                    <Pressable style={styles.contactBtn} onPress={() => router.push('/client-dashboard/messages' as any)}>
-                                        <MessageCircle size={14} color={COLORS.primary} />
-                                        <Text style={styles.contactBtnText}>Contact Admin</Text>
+                                    <Pressable 
+                                        style={[styles.contactBtn, { borderColor: '#EF444433', backgroundColor: '#EF444408' }]} 
+                                        onPress={() => deleteRequest(req.id)}
+                                    >
+                                        <Trash2 size={14} color="#EF4444" />
+                                        <Text style={[styles.contactBtnText, { color: '#EF4444' }]}>Cancel</Text>
                                     </Pressable>
                                 </View>
                             </View>

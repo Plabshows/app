@@ -1,20 +1,18 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-    ArrowLeft,
-    Calendar,
-    Camera,
-    Check,
-    ChevronRight, Clock, CreditCard,
-    FileText, Globe, HelpCircle, Image as ImageIcon, LogOut, MessageCircle, MessageSquare,
-    Send, Shield, Star, Upload, User, X, Zap
+    ArrowLeft, Bell, Calendar, Camera, Check, ChevronRight, Clock, CreditCard, Edit2,
+    FileText, Globe, Heart, HelpCircle, Image as ImageIcon, LogOut, MapPin, MessageCircle, MessageSquare,
+    Send, Settings, Shield, Star, Upload, User, X, Zap
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../../src/constants/theme';
 import { useAuth } from '../../../src/context/AuthContext';
 import { supabase } from '../../../src/lib/supabase';
+import { useActs } from '../../../src/hooks/useActs';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type ImageTarget = 'avatar' | 'banner' | null;
 
@@ -889,8 +887,8 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
                 notes: notes || null,
                 status: 'pending',
                 platform_fee_pct: 20,
-                artist_fee: parseFee(act.fee, act.price_guide) || null,
-                total_amount: parseFee(act.fee, act.price_guide) > 0 ? parseFee(act.fee, act.price_guide) * 1.2 : null,
+                artist_fee: parseFee(act.fee, act.price_guide) > 0 ? parseFee(act.fee, act.price_guide) / 1.2 : null,
+                total_amount: parseFee(act.fee, act.price_guide) || null,
             }));
             
             const { data: inserted, error } = await supabase
@@ -912,12 +910,33 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
 
                 // ✨ NEW: Also send a summary message to the Support/Admin Hub (Unified Inbox)
                 const artistNames = selectedActs.map(a => a.name).join(', ');
+                
+                // 1. Client to Admin (Summary of request)
                 await supabase.from('messages').insert({
                     sender_id: profile.id,
                     receiver_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
                     content: `[BOOKING REQUEST] New inquiry for ${artistNames} on ${eventDate}. (Type: ${partyType || 'N/A'})`,
                     status: 'unread'
                 });
+
+                // 2. Admin to Client (Auto-reply / Notification)
+                await supabase.from('messages').insert({
+                    sender_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
+                    receiver_id: profile.id,
+                    content: `Hello! We've received your booking request for ${artistNames}. Our concierge team will review it and get back to you shortly.`,
+                    status: 'unread'
+                });
+
+                // 3. Admin to Artist(s) (Assignment Notification)
+                const artistMessages = selectedActs.map(act => ({
+                    sender_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
+                    receiver_id: act.id, // Act ID is the Profile ID (Artist's user_id)
+                    content: `Notification: You have a new booking inquiry for "${act.name}" on ${eventDate}! Check your artist dashboard for details.`,
+                    status: 'unread'
+                }));
+                if (artistMessages.length > 0) {
+                    await supabase.from('messages').insert(artistMessages);
+                }
             }
 
             // success: reset
@@ -1152,7 +1171,6 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
     const [requests, setRequests] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [expanded, setExpanded] = React.useState<string | null>(null);
-    const [chatRequestId, setChatRequestId] = React.useState<string | null>(null);
     const statusColor: any = { pending: '#F59E0B', quoted: '#3B82F6', accepted: '#10B981', declined: '#EF4444', paid: '#8B5CF6', canceled: '#EF4444', expired: '#6B7280' };
     React.useEffect(() => {
         supabase.from('booking_requests').select('*,acts(name,category,image_url)').eq('client_id', profile.id).order('created_at', { ascending: false })
@@ -1198,17 +1216,10 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
                                 {r.notes && <Text style={{ color: '#6B7280', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginTop: 4 }}>"{r.notes}"</Text>}
                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                                     <Pressable 
-                                        onPress={() => setChatRequestId(r.id)} 
-                                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#333', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
-                                    >
-                                        <MessageCircle size={16} color={COLORS.primary} />
-                                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>Chat with Admin</Text>
-                                    </Pressable>
-                                    <Pressable 
                                         onPress={() => router.push(`/act/${r.act_id}` as any)} 
-                                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#222', alignItems: 'center' }}
+                                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#333', alignItems: 'center' }}
                                     >
-                                        <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '600' }}>View Artist</Text>
+                                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>View Artist</Text>
                                     </Pressable>
                                 </View>
                             </View>
@@ -1217,308 +1228,81 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
                 );
             })}
             
-            <RequestChatModal 
-                requestId={chatRequestId} 
-                onClose={() => setChatRequestId(null)} 
-            />
+
         </View>
     );
 }
 
 
-// ── SUPPORT TAB (Requests / Soporte) ──────────────────────────────────────
 function ClientSupportTab({ profile }: { profile: any }) {
-    const { user } = useAuth();
-    const [messages, setMessages] = React.useState<any[]>([]);
-    const [newMessage, setNewMessage] = React.useState('');
-    const [loading, setLoading] = React.useState(true);
-    const [sending, setSending] = React.useState(false);
-    const flatListRef = React.useRef<FlatList>(null);
-    const ADMIN_ID = 'cbc605d5-518d-4fab-94e4-3d3cda8cf833';
-
-    React.useEffect(() => {
-        if (!user) return;
-        
-        const fetchMessages = async () => {
-            const { data, error } = await supabase
-                .from('messages')
-                .select('*')
-                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-                .order('created_at', { ascending: true });
-            
-            if (error) {
-                console.error('Error fetching messages:', error);
-            } else {
-                setMessages(data || []);
-            }
-            setLoading(false);
-        };
-
-        fetchMessages();
-
-        const channel = supabase
-            .channel('public:messages')
-            .on('postgres_changes', { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'messages'
-            }, (payload) => {
-                const newMsg = payload.new;
-                if (newMsg.sender_id === user.id || newMsg.receiver_id === user.id) {
-                    setMessages(prev => [...prev, newMsg]);
-                }
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel).catch(console.error); };
-    }, [user]);
-
-    const sendMessage = async () => {
-        if (!newMessage.trim() || !user || sending) return;
-        setSending(true);
-        try {
-            const { error } = await supabase.from('messages').insert({
-                sender_id: user.id,
-                receiver_id: ADMIN_ID,
-                content: newMessage.trim(),
-                status: 'unread'
-            });
-            if (error) throw error;
-            setNewMessage('');
-        } catch (e: any) {
-            Alert.alert('Error', e.message);
-        } finally {
-            setSending(false);
-        }
-    };
-
+    const router = useRouter();
     return (
-        <View style={{ flex: 1, height: 600, backgroundColor: '#000', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A1A' }}>
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A1A1A', backgroundColor: '#0A0A0A' }}>
-                <Text style={{ color: 'white', fontSize: 16, fontWeight: '800' }}>Direct Support Chat</Text>
-                <Text style={{ color: '#6B7280', fontSize: 12 }}>Speak directly with our concierge team</Text>
+        <View style={{ flex: 1, padding: 20, gap: 20 }}>
+            <View style={{ 
+                backgroundColor: 'rgba(204,255,0,0.05)', 
+                borderWidth: 1, 
+                borderColor: 'rgba(204,255,0,0.2)', 
+                borderRadius: 24, 
+                padding: 32,
+                alignItems: 'center',
+                gap: 20
+            }}>
+                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(204,255,0,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                    <MessageCircle size={40} color={COLORS.primary} />
+                </View>
+                
+                <View style={{ alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '800', textAlign: 'center' }}>Concierge Support</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 16, lineHeight: 24, textAlign: 'center', paddingHorizontal: 20 }}>
+                        Need help with a booking, payment, or technical issue? Our expert team is here to assist you 24/7.
+                    </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+                    <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Available Online</Text>
+                </View>
+
+                <Pressable 
+                    onPress={() => router.push('/(tabs)/messages' as any)}
+                    style={{ 
+                        backgroundColor: COLORS.primary, 
+                        width: '100%', 
+                        paddingVertical: 18, 
+                        borderRadius: 16, 
+                        alignItems: 'center',
+                        shadowColor: COLORS.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 5
+                    }}
+                >
+                    <Text style={{ color: '#000', fontWeight: '900', fontSize: 16 }}>CHAT WITH US</Text>
+                </Pressable>
             </View>
 
-            {loading ? (
-                <ActivityIndicator color={COLORS.primary} style={{ flex: 1 }} />
-            ) : (
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                    ListEmptyComponent={() => (
-                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, opacity: 0.5 }}>
-                            <MessageSquare size={48} color="#333" />
-                            <Text style={{ color: '#9CA3AF', marginTop: 16, textAlign: 'center', fontSize: 14 }}>No messages yet. Send your first request below!</Text>
+            <View style={{ gap: 12 }}>
+                <Text style={{ color: '#4B5563', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginLeft: 4 }}>RESOURCES</Text>
+                {[
+                    { icon: FileText, title: 'FAQs & Guidelines', desc: 'Common questions and act rules' },
+                    { icon: Shield, title: 'Safety & Trust', desc: 'Secure payments and verification' }
+                ].map((item, i) => (
+                    <Pressable key={i} style={{ backgroundColor: '#0F0F0F', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#1A1A1A' }}>
+                        <item.icon size={20} color="#6B7280" />
+                        <View style={{ flex: 1, gap: 1 }}>
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{item.title}</Text>
+                            <Text style={{ color: '#4B5563', fontSize: 13 }}>{item.desc}</Text>
                         </View>
-                    )}
-                    renderItem={({ item }) => {
-                        const isMe = item.sender_id === user?.id;
-                        return (
-                            <View style={{
-                                alignSelf: isMe ? 'flex-end' : 'flex-start',
-                                backgroundColor: isMe ? COLORS.primary : '#1A1A1A',
-                                paddingHorizontal: 16,
-                                paddingVertical: 10,
-                                borderRadius: 18,
-                                maxWidth: '80%',
-                                marginBottom: 12,
-                                borderBottomRightRadius: isMe ? 2 : 18,
-                                borderBottomLeftRadius: isMe ? 18 : 2
-                            }}>
-                                <Text style={{ color: isMe ? '#000' : '#FFF', fontSize: 14, fontWeight: '500' }}>{item.content}</Text>
-                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, gap: 4 }}>
-                                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.5)' : '#4B5563', fontSize: 10 }}>
-                                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </Text>
-                                    {isMe && <Check size={10} color="rgba(0,0,0,0.5)" />}
-                                </View>
-                            </View>
-                        );
-                    }}
-                />
-            )}
-
-            <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={100}
-                style={{ borderTopWidth: 1, borderTopColor: '#1A1A1A', backgroundColor: '#050505' }}
-            >
-                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 }}>
-                    <TextInput
-                        style={{ 
-                            flex: 1, 
-                            backgroundColor: '#111', 
-                            color: 'white', 
-                            paddingHorizontal: 16, 
-                            paddingVertical: 10, 
-                            borderRadius: 24, 
-                            fontSize: 14,
-                            maxHeight: 100,
-                            borderWidth: 1,
-                            borderColor: '#222'
-                        }}
-                        placeholder="Type your request here..."
-                        placeholderTextColor="#4B5563"
-                        value={newMessage}
-                        onChangeText={setNewMessage}
-                        multiline
-                    />
-                    <Pressable 
-                        onPress={sendMessage}
-                        disabled={!newMessage.trim() || sending}
-                        style={{ 
-                            width: 44, 
-                            height: 44, 
-                            borderRadius: 22, 
-                            backgroundColor: COLORS.primary, 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            opacity: newMessage.trim() ? 1 : 0.4,
-                            elevation: 4,
-                            shadowColor: COLORS.primary,
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 4
-                        }}
-                    >
-                        {sending ? <ActivityIndicator color="#000" size="small" /> : <Send size={20} color="black" />}
+                        <ChevronRight size={18} color="#374151" />
                     </Pressable>
-                </View>
-            </KeyboardAvoidingView>
+                ))}
+            </View>
         </View>
     );
 }
 
-// ── REQUEST CHAT MODAL ──────────────────────────────────────────────────────
-function RequestChatModal({ requestId, onClose }: { requestId: string | null; onClose: () => void }) {
-    const { user } = useAuth();
-    const [messages, setMessages] = React.useState<any[]>([]);
-    const [newMessage, setNewMessage] = React.useState('');
-    const [loading, setLoading] = React.useState(true);
-    const [sending, setSending] = React.useState(false);
-    const flatListRef = React.useRef<FlatList>(null);
-
-    React.useEffect(() => {
-        if (!requestId) return;
-        
-        const fetchMessages = async () => {
-            const { data } = await supabase
-                .from('booking_messages')
-                .select('*')
-                .eq('booking_request_id', requestId)
-                .order('created_at', { ascending: true });
-            setMessages(data || []);
-            setLoading(false);
-        };
-
-        fetchMessages();
-
-        const channel = supabase
-            .channel(`public:booking_messages:request:${requestId}`)
-            .on('postgres_changes', { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'booking_messages', 
-                filter: `booking_request_id=eq.${requestId}` 
-            }, (payload) => {
-                setMessages(prev => [...prev, payload.new]);
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel).catch(console.error); };
-    }, [requestId]);
-
-    const sendMessage = async () => {
-        if (!newMessage.trim() || !user || sending) return;
-        setSending(true);
-        try {
-            const { error } = await supabase.from('booking_messages').insert({
-                booking_request_id: requestId,
-                sender_id: user.id,
-                sender_role: 'client',
-                message: newMessage.trim()
-            });
-            if (error) throw error;
-            setNewMessage('');
-        } catch (e: any) {
-            Alert.alert('Error', e.message);
-        } finally {
-            setSending(false);
-        }
-    };
-
-    return (
-        <Modal visible={!!requestId} animationType="slide" transparent={false}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' }}>
-                    <Pressable onPress={onClose} style={{ padding: 8 }}>
-                        <ArrowLeft size={24} color="white" />
-                    </Pressable>
-                    <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 10 }}>Chat with Admin</Text>
-                </View>
-
-                {loading ? (
-                    <ActivityIndicator color={COLORS.primary} style={{ flex: 1 }} />
-                ) : (
-                    <FlatList
-                        ref={flatListRef}
-                        data={messages}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ padding: 16 }}
-                        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-                        renderItem={({ item }) => {
-                            const isMe = item.sender_role === 'client';
-                            return (
-                                <View style={{
-                                    alignSelf: isMe ? 'flex-end' : 'flex-start',
-                                    backgroundColor: isMe ? COLORS.primary : '#1A1A1A',
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 10,
-                                    borderRadius: 18,
-                                    maxWidth: '80%',
-                                    marginBottom: 8,
-                                    borderBottomRightRadius: isMe ? 2 : 18,
-                                    borderBottomLeftRadius: isMe ? 18 : 2
-                                }}>
-                                    <Text style={{ color: isMe ? '#000' : '#FFF', fontSize: 14 }}>{item.message}</Text>
-                                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.4)' : '#666', fontSize: 10, marginTop: 4, textAlign: 'right' }}>
-                                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </Text>
-                                </View>
-                            );
-                        }}
-                    />
-                )}
-
-                <KeyboardAvoidingView 
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={{ borderTopWidth: 1, borderTopColor: '#1A1A1A' }}
-                >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#000', gap: 10, paddingBottom: Platform.OS === 'ios' ? 20 : 12 }}>
-                        <TextInput
-                            style={{ flex: 1, backgroundColor: '#111', color: 'white', padding: 12, borderRadius: 20, fontSize: 14 }}
-                            placeholder="Type a message..."
-                            placeholderTextColor="#666"
-                            value={newMessage}
-                            onChangeText={setNewMessage}
-                            multiline
-                        />
-                        <Pressable 
-                            onPress={sendMessage}
-                            disabled={!newMessage.trim() || sending}
-                            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', opacity: newMessage.trim() ? 1 : 0.5 }}
-                        >
-                            {sending ? <ActivityIndicator color="#000" size="small" /> : <Send size={20} color="black" />}
-                        </Pressable>
-                    </View>
-                </KeyboardAvoidingView>
-            </SafeAreaView>
-        </Modal>
-    );
-}
+// Unused: function RequestChatModal({ requestId, onClose }: { requestId: string | null; onClose: () => void }) { ... }
 
 // ── MESSAGES TAB ─────────────────────────────────────────────────────────────
 function ClientMessagesTab({ profile, unreadCount }: { profile: any; unreadCount: number }) {
@@ -1527,7 +1311,7 @@ function ClientMessagesTab({ profile, unreadCount }: { profile: any; unreadCount
         <View style={{ gap: 20 }}>
             {/* Main support card */}
             <Pressable 
-                onPress={() => router.push('/messages' as any)}
+                onPress={() => router.push('/(tabs)/messages' as any)}
                 style={{ 
                     backgroundColor: 'rgba(204,255,0,0.05)', 
                     borderWidth: 1, 

@@ -14,7 +14,8 @@ import {
     User,
     CheckCircle,
     XCircle,
-    CreditCard
+    CreditCard,
+    Trash2
 } from 'lucide-react-native';
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Keyboard } from 'react-native';
@@ -183,11 +184,80 @@ export default function AdminRequestDetail() {
             if (error) throw error;
             setRequest(prev => prev ? { ...prev, status: newStatus } : null);
             Toast.show({ type: 'success', text1: 'Status Updated', text2: `Request is now ${newStatus}` });
+
+            // ✨ NEW: Send automated notifications as messages
+            if (request) {
+                const adminId = 'cbc605d5-518d-4fab-94e4-3d3cda8cf833';
+                const statusLabel = newStatus.toUpperCase();
+                const artistName = request.acts?.name || 'Artist';
+
+                // 1. Message to Client
+                await supabase.from('messages').insert({
+                    sender_id: adminId,
+                    receiver_id: request.client_id,
+                    booking_id: id,
+                    type: 'booking_status',
+                    content: `Your booking request for "${artistName}" is now ${statusLabel}.`,
+                    metadata: {
+                        status: newStatus,
+                        artist_name: artistName,
+                        booking_id: id
+                    },
+                    status: 'unread'
+                });
+
+                // 2. Message to Artist
+                await supabase.from('messages').insert({
+                    sender_id: adminId,
+                    receiver_id: request.artist_id,
+                    booking_id: id,
+                    type: 'booking_status',
+                    content: `The booking request with ${request.client_name} is now ${statusLabel}.`,
+                    metadata: {
+                        status: newStatus,
+                        client_name: request.client_name,
+                        booking_id: id
+                    },
+                    status: 'unread'
+                });
+            }
         } catch (err: any) {
             Toast.show({ type: 'error', text1: 'Update Failed', text2: err.message });
         } finally {
             setUpdatingStatus(false);
         }
+    };
+
+    const deleteRequest = async () => {
+        Alert.alert(
+            'Delete Request',
+            'Are you sure you want to permanently delete this booking request? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Delete', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                        try {
+                            setUpdatingStatus(true);
+                            const { error } = await supabase
+                                .from('booking_requests')
+                                .delete()
+                                .eq('id', id);
+                            
+                            if (error) throw error;
+                            
+                            Toast.show({ type: 'success', text1: 'Deleted', text2: 'Request has been removed.' });
+                            router.replace('/admin');
+                        } catch (err: any) {
+                            Alert.alert('Delete Failed', err.message);
+                        } finally {
+                            setUpdatingStatus(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const getStatusColor = (status: string) => {
@@ -361,9 +431,9 @@ export default function AdminRequestDetail() {
                     {/* Actions */}
                     <View style={styles.actionsContainer}>
                         <Text style={styles.sectionTitle}>Admin Actions</Text>
-                        <View style={styles.actionButtons}>
+                        <View style={[styles.actionButtons, { flexWrap: 'wrap' }]}>
                             <Pressable 
-                                style={[styles.actionBtn, { borderColor: '#4CAF50' }]} 
+                                style={[styles.actionBtn, { borderColor: '#4CAF50', marginBottom: 8 }]} 
                                 onPress={() => updateStatus('accepted')}
                                 disabled={updatingStatus}
                             >
@@ -371,7 +441,7 @@ export default function AdminRequestDetail() {
                                 <Text style={[styles.actionBtnText, { color: '#4CAF50' }]}>Accept</Text>
                             </Pressable>
                             <Pressable 
-                                style={[styles.actionBtn, { borderColor: '#F44336' }]} 
+                                style={[styles.actionBtn, { borderColor: '#F44336', marginBottom: 8 }]} 
                                 onPress={() => updateStatus('declined')}
                                 disabled={updatingStatus}
                             >
@@ -379,12 +449,20 @@ export default function AdminRequestDetail() {
                                 <Text style={[styles.actionBtnText, { color: '#F44336' }]}>Decline</Text>
                             </Pressable>
                             <Pressable 
-                                style={[styles.actionBtn, { borderColor: '#2196F3' }]} 
+                                style={[styles.actionBtn, { borderColor: '#2196F3', marginBottom: 8 }]} 
                                 onPress={() => updateStatus('paid')}
                                 disabled={updatingStatus}
                             >
                                 <CreditCard size={20} color="#2196F3" />
                                 <Text style={[styles.actionBtnText, { color: '#2196F3' }]}>Mark Paid</Text>
+                            </Pressable>
+                            <Pressable 
+                                style={[styles.actionBtn, { borderColor: '#F44336', marginBottom: 8, opacity: 0.7 }]} 
+                                onPress={deleteRequest}
+                                disabled={updatingStatus}
+                            >
+                                <Trash2 size={20} color="#F44336" />
+                                <Text style={[styles.actionBtnText, { color: '#F44336' }]}>Delete</Text>
                             </Pressable>
                         </View>
                     </View>
@@ -412,14 +490,22 @@ export default function AdminRequestDetail() {
 
                 {/* Sticky Message Input */}
                 <View style={styles.inputArea}>
-                    <TextInput
-                        style={styles.input}
-                        value={newMessage}
-                        onChangeText={setNewMessage}
-                        placeholder="Type a message to the client..."
-                        placeholderTextColor={COLORS.textDim}
-                        multiline
-                    />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Type a message to the client..."
+                            placeholderTextColor={COLORS.textDim}
+                            value={newMessage}
+                            onChangeText={setNewMessage}
+                            multiline
+                            onSubmitEditing={Platform.OS !== 'web' ? handleSendMessage : undefined}
+                            blurOnSubmit={false}
+                            onKeyPress={(e: any) => {
+                                if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage();
+                                }
+                            }}
+                        />
                     <Pressable 
                         style={[styles.sendButton, (!newMessage.trim() || sending) && { opacity: 0.5 }]} 
                         onPress={handleSendMessage}

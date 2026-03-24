@@ -2,6 +2,7 @@ import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@/src/context/AuthContext';
 import {
     ChevronLeft,
     ChevronRight,
@@ -19,10 +20,14 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
+    Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import * as z from 'zod';
+
+const ADMIN_ID = 'cbc605d5-518d-4fab-94e4-3d3cda8cf833';
 
 const { width } = Dimensions.get('window');
 
@@ -37,7 +42,7 @@ const bookingSchema = z.object({
     event_type: z.string().min(1, "Event type is required"),
     guests_count: z.string().min(1, "Guest count is required"),
     budget_amount: z.string().optional(),
-    notes: z.string().min(50, "Please provide more details (min 50 characters)"),
+    notes: z.string().min(10, "Please provide more details (min 10 characters)"),
     client_email: z.string().email("Valid email is required"),
     client_phone: z.string().optional(),
     consent: z.boolean().refine(v => v === true, "Consent is required"),
@@ -65,18 +70,26 @@ const DURATIONS = [
 export default function BookingWizard() {
     const { actId, packageData, managedByAdmin } = useLocalSearchParams();
     const router = useRouter();
+    const { user } = useAuth();
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [dateInput, setDateInput] = useState('');
 
-    const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<BookingFormData>({
+    const { control, handleSubmit, formState: { errors }, watch, setValue, getValues } = useForm<BookingFormData>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
             event_dates: [],
+            location_text: '',
             expand_search: false,
-            event_type: '',
-            duration_minutes: '60',
-            notes: '',
+            start_time: '20:00',
             apply_to_all_dates: true,
+            duration_minutes: '120',
+            event_type: 'Private Party',
+            guests_count: '',
+            budget_amount: '',
+            notes: '',
+            client_email: user?.email || '',
+            client_phone: '',
             consent: false,
         }
     });
@@ -88,101 +101,248 @@ export default function BookingWizard() {
 
     const nextStep = () => setStep(prev => Math.min(prev + 1, 9));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+    
+    React.useEffect(() => {
+        if (user?.email && !watch('client_email')) {
+            setValue('client_email', user.email);
+        }
+    }, [user?.email]);
+
+    React.useEffect(() => {
+        if (Object.keys(errors).length > 0) {
+            console.log('[BookingWizard] Validation Errors:', JSON.stringify(errors, null, 2));
+        }
+    }, [errors]);
+
+    // Direct submit — reads live form values, runs the same insert that testInsertBooking used
+    const submitBooking = async () => {
+        // Immediate confirmation the button was pressed
+        console.log('[BookingWizard] submitBooking called');
+        
+        const data = getValues();
+        console.log('[BookingWizard] form values:', JSON.stringify({
+            event_dates: data.event_dates,
+            location_text: data.location_text,
+            event_type: data.event_type,
+            guests_count: data.guests_count,
+            client_email: data.client_email,
+            consent: data.consent,
+        }));
+
+        if (!data.event_dates || data.event_dates.length === 0) {
+            return Alert.alert('\u274c Missing', 'Please select at least one date (Step 1).');
+        }
+        if (!data.location_text || data.location_text.length < 2) {
+            return Alert.alert('\u274c Missing', 'Please enter a location (Step 2).');
+        }
+        if (!data.event_type) {
+            return Alert.alert('\u274c Missing', 'Please select an event type (Step 4).');
+        }
+        if (!data.guests_count) {
+            return Alert.alert('\u274c Missing', 'Please enter a guest count (Step 5).');
+        }
+        if (!data.client_email || !data.client_email.includes('@')) {
+            return Alert.alert('\u274c Missing', 'Please enter your email (Step 8).');
+        }
+        if (!data.consent) {
+            return Alert.alert('\u274c Consent', 'Please accept the terms at the bottom of this page (Step 9).');
+        }
+
+        await onSubmit(data);
+    };
 
     const onSubmit = async (data: BookingFormData) => {
+        console.log('[BookingWizard] onSubmit triggered with data:', data);
         try {
             setIsSubmitting(true);
+            const actIds = typeof actId === 'string' ? actId.split(',') : [actId];
 
-            // 1. Get current user (might be null)
-            const { data: { session } } = await supabase.auth.getSession();
-            const userId = session?.user?.id;
+            // 1. Get current user
+            const userId = user?.id;
 
-            // 2. Resolve artist_id from actId
-            const { data: actData, error: actError } = await supabase
-                .from('acts')
-                .select('owner_id')
-                .eq('id', actId)
-                .single();
-
-            if (actError || !actData) throw new Error("Could not find artist details.");
-
-            // 3. Insert booking request
-            const { data: request, error: insertError } = await supabase
-                .from('booking_requests')
-                .insert({
-                    artist_id: actData.owner_id,
-                    act_id: actId,
-                    client_id: userId || null,
-                    client_email: data.client_email,
-                    client_phone: data.client_phone || null,
-                    event_dates: data.event_dates,
-                    location_text: data.location_text,
-                    expand_search: data.expand_search,
-                    start_time: data.start_time,
-                    apply_to_all_dates: data.apply_to_all_dates,
-                    duration_minutes: parseInt(data.duration_minutes),
-                    event_type: data.event_type,
-                    guests_count: parseInt(data.guests_count),
-                    budget_amount: data.budget_amount ? parseFloat(data.budget_amount) : null,
-                    notes: data.notes,
-                    package_id: packageData ? JSON.parse(packageData as string) : null,
-                    managed_by_admin: managedByAdmin === 'true',
-                    status: 'pending'
-                })
-                .select()
-                .single();
-
-            if (insertError) throw insertError;
-
-            // 4. Send email notification (fire-and-forget — don't block UX)
-            try {
-                const actName = request.act_id; // fallback
-                // Try to get the artist name for the email subject
-                const { data: actInfo } = await supabase
-                    .from('acts')
-                    .select('name')
-                    .eq('id', actId)
-                    .single();
-
-                const artistName = actInfo?.name || actName;
-
-                await supabase.functions.invoke('notify-booking-request', {
-                    body: {
-                        request_id: request.id,
-                        artist_name: artistName,
-                        artist_id: actData.owner_id,
-                        act_id: actId,
-                        package_id: packageData ? JSON.parse(packageData as string) : null,
-                        event_dates: data.event_dates,
-                        start_time: data.start_time,
-                        apply_to_all_dates: data.apply_to_all_dates,
-                        duration_minutes: parseInt(data.duration_minutes),
-                        event_type: data.event_type,
-                        guests_count: parseInt(data.guests_count),
-                        location_text: data.location_text,
-                        address_details: data.address_details || null,
-                        expand_search: data.expand_search,
-                        budget_amount: data.budget_amount ? parseFloat(data.budget_amount) : null,
-                        notes: data.notes,
-                        client_email: data.client_email,
-                        client_phone: data.client_phone || null,
-                        managed_by_admin: managedByAdmin === 'true',
-                    }
+            if (!userId) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Authentication Required',
+                    text2: 'Please log in to submit a booking request.'
                 });
-                console.log('[BookingWizard] Email notification sent');
-            } catch (emailError) {
-                // Don't block the UX if email fails — request is already saved
-                console.error('[BookingWizard] Email notification failed (non-blocking):', emailError);
+                return;
             }
 
-            // 5. Navigate to confirmation with request ID for optional linking
-            router.push({
-                pathname: '/booking/confirmation',
-                params: { requestId: request.id, email: data.client_email }
+            const results: string[] = [];
+            
+            for (const currentActId of actIds) {
+                try {
+                    // 2. Resolve artist_id and act details
+                    const { data: actData, error: actFetchError } = await supabase
+                        .from('acts')
+                        .select('owner_id, name, category, artist_type, image_url')
+                        .eq('id', currentActId)
+                        .single();
+
+                    // CRITICAL: only use real DB values. If act doesn't exist, send null for act_id
+                    // (act_id has a FK constraint → acts.id, so fake UUIDs cause silent insert failures)
+                    const actExists = !!actData && !actFetchError;
+                    const artistId = actData?.owner_id || ADMIN_ID;
+                    const actName = actData?.name || 'General Booking Request';
+                    const actCategory = actData?.category || actData?.artist_type || 'Entertainment';
+                    const actUrl = actExists ? `https://plabshows.com/act/${currentActId}` : null;
+
+                    console.log('[BookingWizard] act lookup:', { currentActId, actExists, artistId, actName });
+
+                    // 3. Insert booking request
+                    const { data: request, error: insertError } = await supabase
+                        .from('booking_requests')
+                        .insert({
+                            artist_id: artistId,
+                            act_id: actExists ? currentActId : null,
+                            client_id: userId,
+                            client_email: data.client_email,
+                            client_phone: data.client_phone || null,
+                            event_dates: data.event_dates,
+                            location_text: data.location_text,
+                            expand_search: data.expand_search,
+                            start_time: data.start_time,
+                            apply_to_all_dates: data.apply_to_all_dates,
+                            duration_minutes: parseInt(data.duration_minutes),
+                            event_type: data.event_type,
+                            guests_count: parseInt(data.guests_count),
+                            budget_amount: data.budget_amount ? parseFloat(data.budget_amount) : null,
+                            notes: data.notes,
+                            package_id: packageData ? JSON.parse(packageData as string) : null,
+                            managed_by_admin: managedByAdmin === 'true',
+                            status: 'pending'
+                        })
+                        .select()
+                        .single();
+
+                    if (insertError) throw insertError;
+
+                    // ✨ Send booking summary to booking chat (non-blocking)
+                    supabase.from('booking_messages').insert({
+                        booking_request_id: request.id,
+                        sender_id: userId,
+                        sender_role: 'client',
+                        type: 'booking_summary',
+                        message: `New Booking Request: ${data.event_type}`,
+                        metadata: {
+                            act_id: actExists ? currentActId : null,
+                            event_type: data.event_type,
+                            event_dates: data.event_dates,
+                            location_text: data.location_text,
+                            duration_minutes: data.duration_minutes,
+                            guests_count: data.guests_count,
+                            budget_amount: data.budget_amount,
+                            notes: data.notes,
+                            client_email: data.client_email,
+                            client_phone: data.client_phone
+                        }
+                    }).then(({ error: bmErr }) => {
+                        if (bmErr) console.error('[BookingWizard] booking_messages fail (non-blocking):', bmErr.message);
+                    });
+
+                    // 🔔 ADMIN ALERT: Notify Superadmin (non-blocking)
+                    const summaryMessage = 
+                        `📋 NEW BOOKING REQUEST\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `🎤 Act: ${actName} (${actCategory})\n` +
+                        `🎭 Event: ${data.event_type}\n` +
+                        `📅 Dates: ${data.event_dates.join(', ')}\n` +
+                        `📍 Location: ${data.location_text}\n` +
+                        `👥 Guests: ${data.guests_count}\n` +
+                        `⏱ Duration: ${data.duration_minutes} min\n` +
+                        `💰 Budget: ${data.budget_amount ? `€${data.budget_amount}` : 'Quote requested'}\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `📧 Email: ${data.client_email}\n` +
+                        `📱 Phone: ${data.client_phone || 'N/A'}\n` +
+                        `📝 Notes: ${data.notes}\n` +
+                        `━━━━━━━━━━━━━━━━━━━━\n` +
+                        `🔗 Act Page: ${actUrl}`;
+
+                    supabase.from('messages').insert({
+                        sender_id: userId,
+                        receiver_id: ADMIN_ID,
+                        content: summaryMessage,
+                        type: 'booking_request',
+                        booking_id: request.id,
+                        status: 'unread',
+                        metadata: {
+                            act_id: currentActId,
+                            act_name: actName,
+                            act_category: actCategory,
+                            act_url: actUrl,
+                            act_image_url: actData?.image_url || null,
+                            event_type: data.event_type,
+                            event_dates: data.event_dates,
+                            location_text: data.location_text,
+                            guests_count: data.guests_count,
+                            duration_minutes: data.duration_minutes,
+                            budget_amount: data.budget_amount || null,
+                            client_email: data.client_email,
+                            client_phone: data.client_phone || null,
+                            booking_id: request.id,
+                        }
+                    }).then(({ error: msgErr }) => {
+                        if (msgErr) console.error('[BookingWizard] messages notify fail (non-blocking):', msgErr.message);
+                    });
+
+                    // 4. Send email notification (non-blocking)
+                    supabase.functions.invoke('notify-booking-request', {
+                        body: {
+                            request_id: request.id,
+                            artist_name: actName,
+                            artist_id: artistId,
+                            act_id: currentActId,
+                            event_dates: data.event_dates,
+                            start_time: data.start_time,
+                            apply_to_all_dates: data.apply_to_all_dates,
+                            duration_minutes: parseInt(data.duration_minutes),
+                            event_type: data.event_type,
+                            guests_count: parseInt(data.guests_count),
+                            location_text: data.location_text,
+                            budget_amount: data.budget_amount ? parseFloat(data.budget_amount) : null,
+                            notes: data.notes,
+                            client_email: data.client_email,
+                            client_phone: data.client_phone || null,
+                        }
+                    }).catch(err => console.error('[BookingWizard] Email fail:', err));
+
+                    results.push(request.id);
+                } catch (actLoopError: any) {
+                    const errMsg = actLoopError?.message || String(actLoopError);
+                    console.error(`[BookingWizard] Error for act ${currentActId}:`, errMsg);
+                    if (results.length === 0) {
+                        throw new Error(`Booking failed: ${errMsg}`);
+                    }
+                }
+            }
+
+            if (results.length === 0) throw new Error("Failed to create any booking requests.");
+
+            Toast.show({
+                type: 'success',
+                text1: 'Request Sent Successfully!',
+                text2: `We've created ${results.length} request(s) for your review.`
             });
+
+            // 5. Navigate to confirmation
+            setTimeout(() => {
+                router.push({
+                    pathname: '/booking/confirmation',
+                    params: { 
+                        requestId: results[0], 
+                        count: results.length,
+                        email: data.client_email 
+                    }
+                });
+            }, 1500);
         } catch (error: any) {
-            console.error('Booking error:', error);
-            alert(error.message || "Something went wrong. Please try again.");
+            Alert.alert("Submission Error", error.message || "Something went wrong.");
+            Toast.show({
+                type: 'error',
+                text1: 'Submission Error',
+                text2: error.message || "Something went wrong. Please try again."
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -196,17 +356,32 @@ export default function BookingWizard() {
                         <Text style={styles.stepTitle}>When is your event?</Text>
                         <Text style={styles.stepSubtitle}>Select one or more dates</Text>
                         <View style={styles.inputGroup}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="YYYY-MM-DD (e.g. 2024-05-20)"
-                                placeholderTextColor="#666"
-                                onSubmitEditing={(e) => {
-                                    const val = e.nativeEvent.text;
-                                    if (val && !selectedDates.includes(val)) {
-                                        setValue('event_dates', [...selectedDates, val]);
-                                    }
-                                }}
-                            />
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1 }]}
+                                    placeholder="YYYY-MM-DD (e.g. 2025-09-20)"
+                                    placeholderTextColor="#666"
+                                    value={dateInput}
+                                    onChangeText={setDateInput}
+                                    onSubmitEditing={() => {
+                                        if (dateInput && !selectedDates.includes(dateInput)) {
+                                            setValue('event_dates', [...selectedDates, dateInput]);
+                                            setDateInput('');
+                                        }
+                                    }}
+                                />
+                                <Pressable
+                                    style={{ backgroundColor: COLORS.primary, paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center' }}
+                                    onPress={() => {
+                                        if (dateInput && !selectedDates.includes(dateInput)) {
+                                            setValue('event_dates', [...selectedDates, dateInput]);
+                                            setDateInput('');
+                                        }
+                                    }}
+                                >
+                                    <Text style={{ color: '#000', fontWeight: '700' }}>Add</Text>
+                                </Pressable>
+                            </View>
                             <View style={styles.dateChips}>
                                 {selectedDates.map(d => (
                                     <Pressable
@@ -368,14 +543,14 @@ export default function BookingWizard() {
                 return (
                     <View style={styles.stepContainer}>
                         <Text style={styles.stepTitle}>Extra Information</Text>
-                        <Text style={styles.stepSubtitle}>Provide details about the stage, sound, or specific requests.</Text>
+                        <Text style={styles.stepSubtitle}>Stage setup, sound requirements, special requests…</Text>
                         <Controller
                             control={control}
                             name="notes"
                             render={({ field: { onChange, value } }) => (
                                 <TextInput
                                     style={[styles.input, styles.textArea]}
-                                    placeholder="Minimum 50 characters..."
+                                    placeholder="Describe your event, stage setup, special requests…"
                                     placeholderTextColor="#666"
                                     multiline
                                     numberOfLines={6}
@@ -384,7 +559,7 @@ export default function BookingWizard() {
                                 />
                             )}
                         />
-                        <Text style={styles.counterText}>{watch('notes').length} / 50 characters</Text>
+                        <Text style={styles.counterText}>{watch('notes').length} characters</Text>
                     </View>
                 );
             case 9:
@@ -438,7 +613,7 @@ export default function BookingWizard() {
                             <View style={[styles.checkbox, consent && styles.checkboxActive]} />
                             <Text style={styles.consentText}>I agree to be contacted regarding this request.</Text>
                         </Pressable>
-                        {errors.consent && <Text style={styles.errorText}>{errors.consent.message}</Text>}
+                        <View style={{ height: 100 }} />
                     </View>
                 );
             default:
@@ -449,7 +624,7 @@ export default function BookingWizard() {
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
                 <View style={styles.header}>
@@ -475,7 +650,7 @@ export default function BookingWizard() {
                     ) : (
                         <Pressable
                             style={[styles.submitButton, isSubmitting && styles.disabled]}
-                            onPress={handleSubmit(onSubmit)}
+                            onPress={submitBooking}
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (
@@ -568,6 +743,8 @@ const styles = StyleSheet.create({
         padding: SPACING.xl,
         borderTopWidth: 1,
         borderTopColor: 'rgba(255,255,255,0.05)',
+        marginBottom: 120, // Lift VERY HIGH above any potential menus
+        backgroundColor: COLORS.background,
     },
     nextButton: {
         backgroundColor: COLORS.primary,

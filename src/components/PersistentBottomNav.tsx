@@ -10,7 +10,6 @@ const TABS = [
     { name: 'index', label: 'Artists', icon: Users, path: '/(tabs)' },
     { name: 'bookings', label: 'Bookings', icon: Calendar, path: '/(tabs)/bookings' },
     { name: 'messages', label: 'Messages', icon: MessageCircle, path: '/(tabs)/messages' },
-    { name: 'notifications', label: 'Notifications', icon: Bell, path: '/(tabs)/notifications' },
     { name: 'profile', label: 'Profile', icon: UserIcon, path: '/(tabs)/profile' },
 ];
 
@@ -37,7 +36,7 @@ export default function PersistentBottomNav() {
         if (!isClient) return TABS;
         const newTabs = [...TABS];
         // Insert Favorites after Artists (index 0)
-        newTabs.splice(1, 0, { name: 'favorites', label: 'Favorites', icon: Heart, path: '/(tabs)/profile?tab=Favorites' });
+        newTabs.splice(1, 0, { name: 'favorites', label: 'Favorites', icon: Heart, path: '/(tabs)/favorites' });
         return newTabs;
     }, [isClient]);
 

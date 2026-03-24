@@ -109,7 +109,7 @@ export default function ClientOverview() {
                     title="Contact Admin"
                     desc="Get help from our team"
                     icon="💬"
-                    onPress={() => router.push('/client-dashboard/messages' as any)}
+                    onPress={() => router.push('/(tabs)/messages' as any)}
                 />
             </View>
         </ScrollView>

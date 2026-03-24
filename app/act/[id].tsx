@@ -11,7 +11,7 @@ import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import Animated, { useSharedValue, useAnimatedStyle, interpolate, Extrapolate, useAnimatedScrollHandler } from 'react-native-reanimated';
-import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, Package, Plus, Save, ShieldCheck, Star, Video as VideoIcon, Zap, ChevronDown, ChevronLeft, ChevronRight, Mail, Instagram, Globe, Trash2, X, Check, Sparkles, Heart } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Clock, FileText, Info, MapPin, MessageSquare, MessageCircle, Package, Plus, Save, ShieldCheck, Star, Video as VideoIcon, Zap, ChevronDown, ChevronLeft, ChevronRight, Mail, Instagram, Globe, Trash2, X, Check, Sparkles, Heart } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -701,18 +701,28 @@ export default function ActDetail() {
                 </Pressable>
 
                 {/* Favorite Button */}
-                {!isEditing && profile?.role === 'client' && (
-                    <Pressable
-                        style={styles.favoriteButtonAbsolute}
-                        onPress={toggleFavorite}
-                    >
-                        <Heart 
-                            size={24} 
-                            color={isFavorite ? COLORS.primary : "#fff"} 
-                            fill={isFavorite ? COLORS.primary : "transparent"} 
-                        />
-                    </Pressable>
-                )}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                        {!isEditing && profile?.role === 'client' && (
+                            <Pressable
+                                style={styles.roundIconBtn}
+                                onPress={() => router.push('/(tabs)/messages' as any)}
+                            >
+                                <MessageCircle size={22} color="#fff" />
+                            </Pressable>
+                        )}
+                        {!isEditing && profile?.role === 'client' && (
+                            <Pressable
+                                style={styles.roundIconBtn}
+                                onPress={toggleFavorite}
+                            >
+                                <Heart 
+                                    size={22} 
+                                    color={isFavorite ? COLORS.primary : "#fff"} 
+                                    fill={isFavorite ? COLORS.primary : "transparent"} 
+                                />
+                            </Pressable>
+                        )}
+                    </View>
 
                 {/* Performance Lab Management Badge */}
                 <View style={styles.agencyBadgeAbsolute}>
@@ -1269,7 +1279,7 @@ export default function ActDetail() {
                     <View style={styles.emptyBox}>
                         <Info size={40} color={COLORS.textDim} style={{ marginBottom: 12 }} />
                         <Text style={styles.emptyText}>Contact the artist directly for custom booking options.</Text>
-                        <Pressable style={styles.inquireBtn}>
+                        <Pressable style={styles.inquireBtn} onPress={() => router.push('/(tabs)/messages' as any)}>
                             <Text style={styles.inquireBtnText}>Inquire for Quote</Text>
                         </Pressable>
                     </View>

@@ -34,7 +34,7 @@ const NAV_ITEMS = [
     { name: 'my-event', label: 'My Event', icon: Calendar, path: '/client-dashboard/my-event' },
     { name: 'favorites', label: 'Favorites', icon: Heart, path: '/client-dashboard/favorites' },
     { name: 'requests', label: 'Requests', icon: Send, path: '/client-dashboard/requests' },
-    { name: 'messages', label: 'Messages', icon: MessageCircle, path: '/client-dashboard/messages' },
+    { name: 'messages', label: 'Messages', icon: MessageCircle, path: '/(tabs)/messages' },
     { name: 'settings', label: 'Settings', icon: Settings, path: '/client-dashboard/settings' },
 ];
 
@@ -161,7 +161,6 @@ export default function ClientDashboardLayout() {
                         <Stack.Screen name="my-event" />
                         <Stack.Screen name="favorites" />
                         <Stack.Screen name="requests" />
-                        <Stack.Screen name="messages" />
                         <Stack.Screen name="settings" />
                     </Stack>
 
