@@ -77,20 +77,36 @@ export function useActs() {
             if (fetchError) throw fetchError;
 
             if (data && data.length > 0) {
-                let mapped = data.map((item: any) => ({
-                    ...item,
-                    // Resolve category name from static map
-                    category: CATEGORY_MAP[item.category_id] || item.category || 'Artist',
-                    category_ids: item.category_ids || [],
-                    categories: item.categories || [],
-                    // Best available image — no filtering
-                    image_url: item.avatar_url
-                        || item.banner_url
-                        || (Array.isArray(item.gallery_urls) ? item.gallery_urls[0] : null)
-                        || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
-                    location_base: item.city || 'International',
-                    location: item.city || 'International',
-                }));
+                let mapped = data.map((item: any) => {
+                    // Apply 20% markup to price_guide for client view
+                    const rawPrice = item.price_guide || '';
+                    let finalPrice = rawPrice;
+                    if (rawPrice) {
+                        const numericMatch = rawPrice.match(/\d+/);
+                        if (numericMatch) {
+                            const num = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+                            if (!isNaN(num)) {
+                                finalPrice = `€${Math.round(num * 1.2).toLocaleString()}`;
+                            }
+                        }
+                    }
+
+                    return {
+                        ...item,
+                        // Resolve category name from static map
+                        category: CATEGORY_MAP[item.category_id] || item.category || 'Artist',
+                        category_ids: item.category_ids || [],
+                        categories: item.categories || [],
+                        // Best available image — no filtering
+                        image_url: item.avatar_url
+                            || item.banner_url
+                            || (Array.isArray(item.gallery_urls) ? item.gallery_urls[0] : null)
+                            || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
+                        location_base: item.city || 'International',
+                        location: item.city || 'International',
+                        price_guide: finalPrice,
+                    };
+                });
 
                 // Client-side category filter applied after fetching all
                 if (category) {

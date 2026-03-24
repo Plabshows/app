@@ -144,6 +144,19 @@ export function useAct(id: string | string[]) {
                 console.warn('[useAct] Reviews fetch error:', revErr);
             }
 
+            // Apply 20% markup to price_guide for client view
+            const rawPrice = actData?.price_guide || prof.price_guide || '';
+            let finalPrice = rawPrice;
+            if (rawPrice) {
+                const numericMatch = rawPrice.match(/\d+/);
+                if (numericMatch) {
+                    const num = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+                    if (!isNaN(num)) {
+                        finalPrice = `€${Math.round(num * 1.2).toLocaleString()}`;
+                    }
+                }
+            }
+
             // Map Unified Profile to ActDetailData structure
             const mappedData: ActDetailData = {
                 id: prof.id,
@@ -174,7 +187,7 @@ export function useAct(id: string | string[]) {
                 category_id: actData?.category_id || prof.category_id,
                 category_ids: actData?.category_ids || prof.category_ids || [],
                 categories: actData?.categories || prof.categories || [],
-                price_guide: actData?.price_guide || prof.price_guide,
+                price_guide: finalPrice,
                 role: prof.role,
                 social_links: prof.social_links || { instagram: '', tiktok: '', website: '' },
                 reviews,

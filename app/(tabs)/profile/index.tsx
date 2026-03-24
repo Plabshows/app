@@ -866,8 +866,9 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
         return isNaN(n) ? 0 : n;
     };
     const subtotal = selectedActs.reduce((sum, a) => sum + parseFee(a.fee, a.price_guide), 0);
-    const platformFee = subtotal * 0.2;
-    const total = subtotal + platformFee;
+    // Since parseFee now returns the marked-up price from the hook, total is the subtotal
+    const total = subtotal; 
+    const platformFee = 0; // Not shown separately anymore
 
 
 
@@ -1117,19 +1118,10 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
                             {selectedActs.map(a => parseFee(a.fee) > 0 && (
                                 <View key={a.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                     <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{a.name}</Text>
-                                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{fmt(parseFee(a.fee))}</Text>
+                                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{fmt(parseFee(a.fee, a.price_guide))}</Text>
                                 </View>
                             ))}
                             <View style={{ height: 1, backgroundColor: '#1A1A1A', marginVertical: 4 }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#6B7280', fontSize: 13 }}>Artist subtotal</Text>
-                                <Text style={{ color: '#6B7280', fontSize: 13 }}>{fmt(subtotal)}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#6B7280', fontSize: 13 }}>Platform fee (20%)</Text>
-                                <Text style={{ color: '#6B7280', fontSize: 13 }}>{fmt(platformFee)}</Text>
-                            </View>
-                            <View style={{ height: 1, backgroundColor: '#1A1A1A', marginVertical: 2 }} />
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                 <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Total</Text>
                                 <Text style={{ color: COLORS.primary, fontSize: 15, fontWeight: '900' }}>{fmt(total)}</Text>
