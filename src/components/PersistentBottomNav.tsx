@@ -1,4 +1,4 @@
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, useLocalSearchParams } from 'expo-router';
 import { Bell, Calendar, Heart, MessageCircle, User as UserIcon, Users } from 'lucide-react-native';
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -18,7 +18,8 @@ export default function PersistentBottomNav() {
     const router = useRouter();
     const segments = useSegments();
     const insets = useSafeAreaInsets();
-    const { profile } = useAuth();
+    const { profile, unreadCount } = useAuth();
+    const params = useLocalSearchParams<{ tab?: string }>();
     const isClient = profile?.role === 'client';
 
     // Check if we should hide the nav
@@ -36,7 +37,7 @@ export default function PersistentBottomNav() {
         if (!isClient) return TABS;
         const newTabs = [...TABS];
         // Insert Favorites after Artists (index 0)
-        newTabs.splice(1, 0, { name: 'favorites', label: 'Favorites', icon: Heart, path: '/(tabs)/favorites' });
+        newTabs.splice(1, 0, { name: 'favorites', label: 'Favorites', icon: Heart, path: '/(tabs)/profile?tab=Favorites' });
         return newTabs;
     }, [isClient]);
 
@@ -53,7 +54,9 @@ export default function PersistentBottomNav() {
             }
         ]}>
             {tabsToRender.map((tab) => {
-                const isActive = activeTab === tab.name;
+                const isActive = (activeTab === tab.name) || 
+                                (tab.name === 'favorites' && activeTab === 'profile' && params.tab === 'Favorites') ||
+                                (tab.name === 'profile' && activeTab === 'profile' && !params.tab);
                 const Icon = tab.icon;
 
                 return (
@@ -63,11 +66,20 @@ export default function PersistentBottomNav() {
                         onPress={() => router.push(tab.path as any)}
                         activeOpacity={0.7}
                     >
-                        <Icon
-                            size={24}
-                            color={isActive ? COLORS.primary : '#6B7280'}
-                            strokeWidth={isActive ? 2.5 : 2}
-                        />
+                        <View>
+                            <Icon
+                                size={24}
+                                color={isActive ? COLORS.primary : '#6B7280'}
+                                strokeWidth={isActive ? 2.5 : 2}
+                            />
+                            {tab.name === 'messages' && unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                         <Text style={[
                             styles.label,
                             { color: isActive ? COLORS.primary : '#6B7280' }
@@ -104,5 +116,24 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '500',
         marginTop: 4,
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -8,
+        backgroundColor: COLORS.primary,
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 1.5,
+        borderColor: '#050505',
+    },
+    badgeText: {
+        color: '#000',
+        fontSize: 9,
+        fontWeight: '900',
     },
 });

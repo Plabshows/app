@@ -14,6 +14,7 @@ type AuthContextType = {
     impersonatedAct: any | null;
     isImpersonating: boolean;
     loading: boolean;
+    unreadCount: number;
     signOut: () => Promise<void>;
     refreshAuth: () => Promise<void>;
     startImpersonation: (userId: string) => Promise<void>;
@@ -31,6 +32,7 @@ const AuthContext = createContext<AuthContextType>({
     impersonatedAct: null,
     isImpersonating: false,
     loading: true,
+    unreadCount: 0,
     signOut: async () => { },
     refreshAuth: async () => { },
     startImpersonation: async () => { },
@@ -45,6 +47,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [impersonatedProfile, setImpersonatedProfile] = useState<any | null>(null);
     const [impersonatedAct, setImpersonatedAct] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     const fetchProfileData = async (userId: string) => {
         try {
@@ -75,7 +78,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
         } finally {
+            fetchUnreadCount(userId);
             setLoading(false);
+        }
+    };
+
+    const [fetchingUnread, setFetchingUnread] = useState(false);
+    const fetchUnreadCount = async (userId: string) => {
+        if (!userId || fetchingUnread) return;
+        setFetchingUnread(true);
+        try {
+            let supportUnread = 0;
+            let bookingUnread = 0;
+
+            if (profile?.role === 'admin' || profile?.is_admin) {
+                // Admin sees ALL unread support messages
+                const { count: sCount } = await supabase
+                    .from('messages')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('status', 'unread');
+                supportUnread = sCount || 0;
+                
+                // Admin sees ALL unread booking messages
+                const { count: bCount } = await supabase
+                    .from('booking_messages')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('is_read', false)
+                    .neq('sender_role', 'admin');
+                bookingUnread = bCount || 0;
+            } else {
+                // Regular user logic: Support messages sent TO them
+                const { count: sCount } = await supabase
+                    .from('messages')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('receiver_id', userId)
+                    .eq('status', 'unread');
+                supportUnread = sCount || 0;
+
+                // Regular user logic: Booking messages in their threads not sent BY them
+                const { data: userBookings } = await supabase
+                    .from('booking_requests')
+                    .select('id')
+                    .or(`client_id.eq.${userId},artist_id.eq.${userId}`);
+                
+                if (userBookings && userBookings.length > 0) {
+                    const bookingIds = userBookings.map(b => b.id);
+                    const { count: bCount } = await supabase
+                        .from('booking_messages')
+                        .select('*', { count: 'exact', head: true })
+                        .in('booking_request_id', bookingIds)
+                        .neq('sender_id', userId)
+                        .eq('is_read', false);
+                    bookingUnread = bCount || 0;
+                }
+            }
+            setUnreadCount(supportUnread + bookingUnread);
+        } catch (err) {
+            console.error('Error fetching unread count:', err);
+        } finally {
+            setFetchingUnread(false);
         }
     };
 
@@ -172,11 +233,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         checkInitialSession();
 
+        // Subscribe to unread count changes
+        let supportSub: any;
+        let bookingSub: any;
+
+        if (user?.id) {
+            supportSub = supabase.channel('global_support_unread')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchUnreadCount(user.id))
+                .subscribe();
+            
+            bookingSub = supabase.channel('global_booking_unread')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_messages' }, () => fetchUnreadCount(user.id))
+                .subscribe();
+        }
+
         return () => {
             mounted = false;
             subscription.unsubscribe();
+            if (supportSub) supabase.removeChannel(supportSub);
+            if (bookingSub) supabase.removeChannel(bookingSub);
         };
-    }, []);
+    }, [user?.id]);
 
     const refreshAuth = async () => {
         setLoading(true);
@@ -244,6 +321,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             impersonatedAct,
             isImpersonating: !!impersonatedProfile,
             loading,
+            unreadCount,
             signOut,
             refreshAuth,
             startImpersonation,

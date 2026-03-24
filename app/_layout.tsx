@@ -87,9 +87,11 @@ function RootLayoutNav() {
 
       // Artists redirect from auth pages to their dashboard
       // Clients can freely browse /(tabs) to discover artists
-    } else if (!loading && !effectiveUser && segments[0] === 'admin') {
-      console.log('Middleware: Intento de acceso a /admin SIN SESIÓN');
-      router.replace('/login');
+    } else if (!loading && !effectiveUser) {
+      // No session — redirect to login from any protected page
+      if (!inAuthGroup) {
+        router.replace('/login');
+      }
     }
   }, [user, realUser, loading, segments, isImpersonating]);
 

@@ -1,30 +1,29 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
+    ArrowLeft,
     Calendar,
     Camera,
     Check,
     ChevronRight, Clock, CreditCard,
-    FileText, Globe, HelpCircle, Image as ImageIcon, LogOut, MessageCircle,
-    Shield, Star, Upload, User, X, Zap
+    FileText, Globe, HelpCircle, Image as ImageIcon, LogOut, MessageCircle, MessageSquare,
+    Send, Shield, Star, Upload, User, X, Zap
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import {
-    ActivityIndicator, Alert, FlatList, Image, Modal,
-    Pressable, ScrollView, TextInput,
-    StyleSheet, Text, View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../../src/constants/theme';
 import { useAuth } from '../../../src/context/AuthContext';
 import { supabase } from '../../../src/lib/supabase';
 
 type ImageTarget = 'avatar' | 'banner' | null;
 
+const fmt = (n: number) => n > 0 ? `€${n.toLocaleString('en-EU', { minimumFractionDigits: 0 })}` : '—';
+
 export default function ProfileScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { user, session, profile, artistAct, loading, signOut, refreshAuth } = useAuth();
+    const { user, session, profile, artistAct, loading, signOut, refreshAuth, unreadCount } = useAuth();
 
     // Image upload state
     const [modalVisible, setModalVisible] = useState(false);
@@ -53,6 +52,7 @@ export default function ProfileScreen() {
         || (Array.isArray(artistAct?.photos_url) && isRealPhoto(artistAct.photos_url[0]) ? artistAct.photos_url[0] : null)
         || null;
     const displayLocation = [profile?.city, profile?.country].filter(Boolean).join(', ') || 'Location not set';
+
 
     // Open image picker modal
     const openImageModal = (target: ImageTarget) => {
@@ -229,11 +229,11 @@ export default function ProfileScreen() {
 
     // ── CLIENT ROLE: show a tailored client profile ──────────────────────────
     if (profile?.role === 'client') {
-        return <ClientProfileScreen profile={profile} router={router} signOut={signOut} />;
+        return <ClientProfileScreen profile={profile} router={router} signOut={signOut} unreadCount={unreadCount} />;
     }
 
-    const MenuItem = ({ icon: Icon, title, subtitle, onPress, color = COLORS.text, rightIcon: RightIcon = ChevronRight }:
-        { icon: any, title: string, subtitle?: string, onPress: () => void, color?: string, rightIcon?: any }) => (
+    const MenuItem = ({ icon: Icon, title, subtitle, onPress, color = COLORS.text, rightIcon: RightIcon = ChevronRight, badgeCount = 0 }:
+        { icon: any, title: string, subtitle?: string, onPress: () => void, color?: string, rightIcon?: any, badgeCount?: number }) => (
         <Pressable
             style={({ pressed }) => [
                 styles.menuItem,
@@ -246,6 +246,11 @@ export default function ProfileScreen() {
                     <Icon size={22} color={color === '#ff4444' ? color : COLORS.primary} />
                 </View>
                 <Text style={[styles.menuItemText, { color }]}>{title}</Text>
+                {badgeCount > 0 && (
+                    <View style={{ backgroundColor: COLORS.primary, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 10, paddingHorizontal: 6 }}>
+                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '900' }}>{badgeCount}</Text>
+                    </View>
+                )}
             </View>
             <View style={styles.menuItemRight}>
                 {subtitle && <Text style={styles.menuItemSubtitle}>{subtitle}</Text>}
@@ -505,7 +510,8 @@ export default function ProfileScreen() {
                         <MenuItem
                             icon={HelpCircle}
                             title="Help"
-                            onPress={() => { }}
+                            onPress={() => router.push('/messages' as any)}
+                            badgeCount={unreadCount}
                         />
                         <MenuItem
                             icon={LogOut}
@@ -527,12 +533,21 @@ export default function ProfileScreen() {
 // CLIENT PROFILE SCREEN — fully tab-based, no sidebar, no external dashboard
 // Tabs: Overview | My Event | Favorites | Requests | Messages | Settings
 // ─────────────────────────────────────────────────────────────────────────────
-const CLIENT_TABS = ['Overview', 'My Event', 'Favorites', 'Requests', 'Messages', 'Settings'] as const;
+const CLIENT_TABS = ['Overview', 'My Event', 'Favorites', 'Booking Requests', 'Support Chat', 'Settings'];
+const ARTIST_TABS = ['Overview', 'My Events', 'Calendar', 'Reviews', 'Support Chat', 'Settings'];
 type ClientTab = typeof CLIENT_TABS[number];
 
-function ClientProfileScreen({ profile, router, signOut }: { profile: any; router: any; signOut: () => Promise<void> }) {
-    const [tab, setTab] = React.useState<ClientTab>('Overview');
+function ClientProfileScreen({ profile, router, signOut, unreadCount }: { profile: any; router: any; signOut: () => Promise<void>; unreadCount: number }) {
+    const params = useLocalSearchParams<{ tab?: string }>();
+    const [tab, setTab] = React.useState<ClientTab>((params.tab as ClientTab) || 'Overview');
     const { refreshAuth } = useAuth();
+
+    // Sync state with URL params if they change
+    React.useEffect(() => {
+        if (params.tab && params.tab !== tab) {
+            setTab(params.tab as ClientTab);
+        }
+    }, [params.tab]);
 
     return (
         <View style={{ flex: 1, backgroundColor: '#050505' }}>
@@ -567,8 +582,32 @@ function ClientProfileScreen({ profile, router, signOut }: { profile: any; route
                     <View style={{ flexDirection: 'row', gap: 4, paddingBottom: 0 }}>
                         {CLIENT_TABS.map(t => (
                             <Pressable key={t} onPress={() => setTab(t)}
-                                style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: tab === t ? COLORS.primary : '#0F0F0F', borderWidth: 1, borderColor: tab === t ? COLORS.primary : '#1A1A1A', marginBottom: 16 }}>
+                                style={{ 
+                                    paddingVertical: 8, 
+                                    paddingHorizontal: 14, 
+                                    borderRadius: 20, 
+                                    backgroundColor: tab === t ? COLORS.primary : '#0F0F0F', 
+                                    borderWidth: 1, 
+                                    borderColor: tab === t ? COLORS.primary : '#1A1A1A', 
+                                    marginBottom: 16,
+                                    flexDirection: 'row',
+                                    alignItems: 'center'
+                                }}>
                                 <Text style={{ color: tab === t ? '#000' : '#6B7280', fontSize: 13, fontWeight: tab === t ? '800' : '500' }}>{t}</Text>
+                                {t === 'Support Chat' && unreadCount > 0 && (
+                                    <View style={{ 
+                                        backgroundColor: tab === t ? '#000' : COLORS.primary, 
+                                        borderRadius: 8, 
+                                        minWidth: 16, 
+                                        height: 16, 
+                                        justifyContent: 'center', 
+                                        alignItems: 'center', 
+                                        marginLeft: 6, 
+                                        paddingHorizontal: 4 
+                                    }}>
+                                        <Text style={{ color: tab === t ? COLORS.primary : '#000', fontSize: 9, fontWeight: '900' }}>{unreadCount}</Text>
+                                    </View>
+                                )}
                             </Pressable>
                         ))}
                     </View>
@@ -577,11 +616,11 @@ function ClientProfileScreen({ profile, router, signOut }: { profile: any; route
 
             {/* Tab content */}
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingTop: 8, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                {tab === 'Overview' && <ClientOverviewTab profile={profile} router={router} setTab={setTab} />}
+                {tab === 'Overview' && <ClientOverviewTab profile={profile} router={router} setTab={setTab} signOut={signOut} />}
                 {tab === 'My Event' && <ClientMyEventTab profile={profile} />}
                 {tab === 'Favorites' && <ClientFavoritesTab profile={profile} router={router} refreshAuth={refreshAuth} />}
-                {tab === 'Requests' && <ClientRequestsTab profile={profile} router={router} />}
-                {tab === 'Messages' && <ClientMessagesTab profile={profile} />}
+                {tab === 'Booking Requests' && <ClientRequestsTab profile={profile} router={router} />}
+                {tab === 'Support Chat' && <ClientSupportTab profile={profile} />}
                 {tab === 'Settings' && <ClientSettingsTab profile={profile} signOut={signOut} refreshAuth={refreshAuth} />}
             </ScrollView>
         </View>
@@ -589,7 +628,7 @@ function ClientProfileScreen({ profile, router, signOut }: { profile: any; route
 }
 
 // ── OVERVIEW TAB ─────────────────────────────────────────────────────────────
-function ClientOverviewTab({ profile, router, setTab }: { profile: any; router: any; setTab: (t: any) => void }) {
+function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any; router: any; setTab: (t: any) => void; signOut: () => Promise<void> }) {
     const [requests, setRequests] = React.useState<any[]>([]);
     const [event, setEvent] = React.useState<any>(null);
     const [loading, setLoading] = React.useState(true);
@@ -647,10 +686,41 @@ function ClientOverviewTab({ profile, router, setTab }: { profile: any; router: 
                 </View>
             )}
 
-            {/* Explore */}
-            <Pressable onPress={() => router.replace('/(tabs)' as any)} style={{ backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#000', fontWeight: '800', fontSize: 15 }}>🎤  Explore Artists</Text>
-            </Pressable>
+            {/* Account Menu */}
+            <View style={{ marginTop: 10 }}>
+                <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 15 }}>ACCOUNT</Text>
+                
+                {[
+                    { title: 'Explore Artists', icon: '🎤', onPress: () => router.replace('/(tabs)') },
+                    { title: 'My Favorites', icon: '♥', onPress: () => setTab('Favorites') },
+                    { title: 'My Dashboard', icon: '📋', onPress: () => setTab('Overview') }, // Keep link to itself but it's redundant, or set to 'My Event'
+                    { title: 'Contact Admin', icon: '💬', onPress: () => setTab('Messages') },
+                    { title: 'Settings', icon: '⚙️', onPress: () => setTab('Settings') },
+                    { title: 'Log Out', icon: '🚪', onPress: signOut, color: '#EF4444' },
+                ].map((item: any, idx) => (
+                    <Pressable 
+                        key={idx} 
+                        onPress={item.onPress}
+                        style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center', 
+                            backgroundColor: '#0F0F0F', 
+                            padding: 16, 
+                            borderRadius: 14, 
+                            borderWidth: 1, 
+                            borderColor: '#1A1A1A',
+                            marginBottom: 10,
+                            justifyContent: 'space-between'
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                            <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+                            <Text style={{ color: item.color || '#FFF', fontSize: 15, fontWeight: '600' }}>{item.title}</Text>
+                        </View>
+                        <ChevronRight size={18} color="#4B5563" />
+                    </Pressable>
+                ))}
+            </View>
         </View>
     );
 }
@@ -676,7 +746,20 @@ function ClientMyEventTab({ profile }: { profile: any }) {
         setSaving(true);
         const payload = { client_id: profile.id, title: form.title, event_type: form.event_type, location: form.location, event_date: form.event_date||null, guest_count: form.guest_count ? parseInt(form.guest_count) : null, budget_range: form.budget_range, notes: form.notes, status: form.status, updated_at: new Date().toISOString() };
         const { error } = event ? await supabase.from('client_events').update(payload).eq('id', event.id) : await supabase.from('client_events').insert(payload);
-        if (!error) { setEditing(false); load(); Alert.alert('Saved ✓', 'Your event brief has been saved.'); }
+        
+        if (!error) { 
+            // ✨ NEW: Notify Admin about the Event Brief
+            await supabase.from('messages').insert({
+                sender_id: profile.id,
+                receiver_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833',
+                content: `[EVENT BRIEF] ${event ? 'Updated' : 'New'} brief: "${form.title}" for ${form.event_date || 'TBD'}. Status: ${form.status}`,
+                status: 'unread'
+            });
+
+            setEditing(false); 
+            load(); 
+            Alert.alert('Saved ✓', 'Your event brief has been saved and our team has been notified.'); 
+        }
         else Alert.alert('Error', error.message);
         setSaving(false);
     };
@@ -750,8 +833,8 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
     // ── load favorites ────────────────────────────────────────────────────────
     React.useEffect(() => {
         const ids = profile?.favorites || [];
-        if (!ids.length) { setLoading(false); return; }
-        supabase.from('acts').select('id,name,category,image_url,location_base,price_guide,fee').in('id', ids)
+        if (!ids.length) { setLoading(false); setActs([]); return; }
+        supabase.from('acts').select('id,name,category,image_url,location_base,price_guide,fee,owner_id').in('owner_id', ids)
             .then(({ data }) => { setActs(data || []); setLoading(false); });
     }, [profile?.favorites]);
 
@@ -776,15 +859,17 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
 
     // ── price helpers ─────────────────────────────────────────────────────────
     const selectedActs = acts.filter(a => selected.has(a.id));
-    const parseFee = (fee: any): number => {
-        if (!fee) return 0;
-        const n = parseFloat(String(fee).replace(/[^0-9.]/g, ''));
+    const parseFee = (fee: any, priceGuide?: any): number => {
+        const raw = fee ?? priceGuide;
+        if (!raw) return 0;
+        const n = parseFloat(String(raw).replace(/[^0-9.]/g, ''));
         return isNaN(n) ? 0 : n;
     };
-    const subtotal = selectedActs.reduce((sum, a) => sum + parseFee(a.fee), 0);
+    const subtotal = selectedActs.reduce((sum, a) => sum + parseFee(a.fee, a.price_guide), 0);
     const platformFee = subtotal * 0.2;
     const total = subtotal + platformFee;
-    const fmt = (n: number) => n > 0 ? `€${n.toLocaleString('en-EU', { minimumFractionDigits: 0 })}` : '—';
+
+
 
     // ── submit booking ────────────────────────────────────────────────────────
     const submitBookings = async () => {
@@ -803,16 +888,43 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
                 notes: notes || null,
                 status: 'pending',
                 platform_fee_pct: 20,
-                artist_fee: parseFee(act.fee) || null,
-                total_amount: parseFee(act.fee) > 0 ? parseFee(act.fee) * 1.2 : null,
+                artist_fee: parseFee(act.fee, act.price_guide) || null,
+                total_amount: parseFee(act.fee, act.price_guide) > 0 ? parseFee(act.fee, act.price_guide) * 1.2 : null,
             }));
-            const { error } = await supabase.from('booking_requests').insert(rows);
+            
+            const { data: inserted, error } = await supabase
+                .from('booking_requests')
+                .insert(rows)
+                .select();
+            
             if (error) throw error;
+
+            // Also send an initial message for each request in the booking chat
+            if (inserted && inserted.length > 0) {
+                const messageRows = inserted.map(req => ({
+                    booking_request_id: req.id,
+                    sender_id: profile.id,
+                    sender_role: 'client',
+                    message: `Initial Inquiry: I'm interested in booking for a ${partyType || 'event'} on ${eventDate}. ${notes ? '\nNotes: ' + notes : ''}`
+                }));
+                await supabase.from('booking_messages').insert(messageRows);
+
+                // ✨ NEW: Also send a summary message to the Support/Admin Hub (Unified Inbox)
+                const artistNames = selectedActs.map(a => a.name).join(', ');
+                await supabase.from('messages').insert({
+                    sender_id: profile.id,
+                    receiver_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
+                    content: `[BOOKING REQUEST] New inquiry for ${artistNames} on ${eventDate}. (Type: ${partyType || 'N/A'})`,
+                    status: 'unread'
+                });
+            }
+
             // success: reset
             setSuccessIds(selectedActs.map(a => a.id));
             setSelected(new Set());
             setShowCheckout(false);
             setEventDate(''); setEventTime(''); setLocation(''); setPartyType(''); setNotes('');
+            // No strict Alert here, we use the successIds banner for better UX
         } catch (e: any) {
             Alert.alert('Error', e.message || 'Could not send request.');
         } finally {
@@ -1048,6 +1160,7 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
     const [requests, setRequests] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [expanded, setExpanded] = React.useState<string | null>(null);
+    const [chatRequestId, setChatRequestId] = React.useState<string | null>(null);
     const statusColor: any = { pending: '#F59E0B', quoted: '#3B82F6', accepted: '#10B981', declined: '#EF4444', paid: '#8B5CF6', canceled: '#EF4444', expired: '#6B7280' };
     React.useEffect(() => {
         supabase.from('booking_requests').select('*,acts(name,category,image_url)').eq('client_id', profile.id).order('created_at', { ascending: false })
@@ -1075,7 +1188,15 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
                             <View style={{ flex: 1 }}><Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15, marginBottom: 2 }}>{r.acts?.name || 'Artist'}</Text>{r.acts?.category && <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: '600' }}>{r.acts.category}</Text>}</View>
                             <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: sc + '22', borderWidth: 1, borderColor: sc + '44' }}><Text style={{ color: sc, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>{r.status}</Text></View>
                         </View>
-                        <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 8 }}>📅 {r.event_dates?.[0] ? new Date(r.event_dates[0]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}  ·  Sent {new Date(r.created_at).toLocaleDateString('en-GB')}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 }}>
+                            <Text style={{ color: '#6B7280', fontSize: 12 }}>📅 {r.event_dates?.[0] ? new Date(r.event_dates[0]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}  ·  Sent {new Date(r.created_at).toLocaleDateString('en-GB')}</Text>
+                            {r.total_amount && (
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={{ color: COLORS.primary, fontWeight: '800', fontSize: 13 }}>{fmt(r.total_amount)}</Text>
+                                    <Text style={{ color: '#4B5563', fontSize: 10 }}>Total incl. fee</Text>
+                                </View>
+                            )}
+                        </View>
                         {isOpen && (
                             <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#1A1A1A', gap: 6 }}>
                                 {r.location_text && <Text style={{ color: '#9CA3AF', fontSize: 13 }}>📍 {r.location_text}</Text>}
@@ -1083,69 +1204,393 @@ function ClientRequestsTab({ profile, router }: { profile: any; router: any }) {
                                 {r.guests_count && <Text style={{ color: '#9CA3AF', fontSize: 13 }}>👥 {r.guests_count} guests</Text>}
                                 {r.budget_amount && <Text style={{ color: '#9CA3AF', fontSize: 13 }}>💰 {r.budget_currency} {r.budget_amount}</Text>}
                                 {r.notes && <Text style={{ color: '#6B7280', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginTop: 4 }}>"{r.notes}"</Text>}
-                                <Pressable onPress={() => router.push(`/act/${r.act_id}` as any)} style={{ marginTop: 8, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#222', alignItems: 'center' }}>
-                                    <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '600' }}>View Artist Profile</Text>
-                                </Pressable>
+                                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                    <Pressable 
+                                        onPress={() => setChatRequestId(r.id)} 
+                                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#333', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+                                    >
+                                        <MessageCircle size={16} color={COLORS.primary} />
+                                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>Chat with Admin</Text>
+                                    </Pressable>
+                                    <Pressable 
+                                        onPress={() => router.push(`/act/${r.act_id}` as any)} 
+                                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#222', alignItems: 'center' }}
+                                    >
+                                        <Text style={{ color: '#9CA3AF', fontSize: 13, fontWeight: '600' }}>View Artist</Text>
+                                    </Pressable>
+                                </View>
                             </View>
                         )}
                     </Pressable>
                 );
             })}
+            
+            <RequestChatModal 
+                requestId={chatRequestId} 
+                onClose={() => setChatRequestId(null)} 
+            />
         </View>
     );
 }
 
-// ── MESSAGES TAB ─────────────────────────────────────────────────────────────
-function ClientMessagesTab({ profile }: { profile: any }) {
+
+// ── SUPPORT TAB (Requests / Soporte) ──────────────────────────────────────
+function ClientSupportTab({ profile }: { profile: any }) {
     const { user } = useAuth();
-    const [subject, setSubject] = React.useState('');
-    const [message, setMessage] = React.useState('');
+    const [messages, setMessages] = React.useState<any[]>([]);
+    const [newMessage, setNewMessage] = React.useState('');
+    const [loading, setLoading] = React.useState(true);
     const [sending, setSending] = React.useState(false);
-    const [history, setHistory] = React.useState<any[]>([]);
-    const [sent, setSent] = React.useState(false);
-    const loadHistory = React.useCallback(async () => {
-        if (!user?.id) return;
-        const { data: conv } = await supabase.from('conversations').select('id').eq('user_id', user.id).eq('type', 'support').maybeSingle();
-        if (conv) { const { data: msgs } = await supabase.from('messages').select('*').eq('conversation_id', conv.id).order('created_at', { ascending: false }).limit(20); setHistory(msgs || []); }
-    }, [user?.id]);
-    React.useEffect(() => { loadHistory(); }, [loadHistory]);
-    const send = async () => {
-        if (!message.trim()) { Alert.alert('Error', 'Please write a message.'); return; }
+    const flatListRef = React.useRef<FlatList>(null);
+    const ADMIN_ID = 'cbc605d5-518d-4fab-94e4-3d3cda8cf833';
+
+    React.useEffect(() => {
+        if (!user) return;
+        
+        const fetchMessages = async () => {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+                .order('created_at', { ascending: true });
+            
+            if (error) {
+                console.error('Error fetching messages:', error);
+            } else {
+                setMessages(data || []);
+            }
+            setLoading(false);
+        };
+
+        fetchMessages();
+
+        const channel = supabase
+            .channel('public:messages')
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'messages'
+            }, (payload) => {
+                const newMsg = payload.new;
+                if (newMsg.sender_id === user.id || newMsg.receiver_id === user.id) {
+                    setMessages(prev => [...prev, newMsg]);
+                }
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel).catch(console.error); };
+    }, [user]);
+
+    const sendMessage = async () => {
+        if (!newMessage.trim() || !user || sending) return;
         setSending(true);
         try {
-            let convId: string;
-            const { data: ex } = await supabase.from('conversations').select('id').eq('user_id', user!.id).eq('type', 'support').maybeSingle();
-            if (ex) { convId = ex.id; } else { const { data: nc, error } = await supabase.from('conversations').insert({ user_id: user!.id, type: 'support', metadata: {} }).select('id').single(); if (error) throw error; convId = nc.id; }
-            const { error } = await supabase.from('messages').insert({ conversation_id: convId, sender_id: user!.id, content: subject ? `**${subject}**\n\n${message}` : message });
+            const { error } = await supabase.from('messages').insert({
+                sender_id: user.id,
+                receiver_id: ADMIN_ID,
+                content: newMessage.trim(),
+                status: 'unread'
+            });
             if (error) throw error;
-            setSent(true); setSubject(''); setMessage(''); loadHistory();
-        } catch (e: any) { Alert.alert('Error', e.message); } finally { setSending(false); }
+            setNewMessage('');
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        } finally {
+            setSending(false);
+        }
     };
+
     return (
-        <View style={{ gap: 16 }}>
-            <View style={{ backgroundColor: 'rgba(204,255,0,0.05)', borderWidth: 1, borderColor: 'rgba(204,255,0,0.2)', borderRadius: 14, padding: 16, flexDirection: 'row', gap: 12 }}>
-                <Text style={{ fontSize: 20 }}>💬</Text>
-                <Text style={{ color: '#9CA3AF', fontSize: 13, lineHeight: 20, flex: 1 }}>Send us a message and our concierge team will assist you personally.</Text>
+        <View style={{ flex: 1, height: 600, backgroundColor: '#000', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1A1A1A' }}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A1A1A', backgroundColor: '#0A0A0A' }}>
+                <Text style={{ color: 'white', fontSize: 16, fontWeight: '800' }}>Direct Support Chat</Text>
+                <Text style={{ color: '#6B7280', fontSize: 12 }}>Speak directly with our concierge team</Text>
             </View>
-            <View style={{ backgroundColor: '#0F0F0F', borderRadius: 18, borderWidth: 1, borderColor: '#1A1A1A', padding: 20, gap: 14 }}>
-                {sent && <View style={{ backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}><Text style={{ color: '#10B981', fontWeight: '600' }}>✓ Message sent! We'll reply soon.</Text></View>}
-                <View><Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Subject (optional)</Text><TextInput style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 14 }} value={subject} onChangeText={setSubject} placeholder="e.g. Artist inquiry for my event" placeholderTextColor="#4B5563" /></View>
-                <View><Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Message</Text><TextInput style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 14, height: 120, textAlignVertical: 'top' }} value={message} onChangeText={setMessage} placeholder="Tell us how we can help..." placeholderTextColor="#4B5563" multiline /></View>
-                <Pressable onPress={send} disabled={sending} style={{ paddingVertical: 14, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center', opacity: sending ? 0.6 : 1 }}>
-                    {sending ? <ActivityIndicator color="#000" size="small" /> : <Text style={{ color: '#000', fontWeight: '800', fontSize: 15 }}>Send Message</Text>}
-                </Pressable>
-            </View>
-            {history.length > 0 && (
-                <View>
-                    <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>Previous Messages</Text>
-                    {history.map(m => (
-                        <View key={m.id} style={{ backgroundColor: '#0F0F0F', borderRadius: 12, borderWidth: 1, borderColor: '#1A1A1A', padding: 14, marginBottom: 8 }}>
-                            <Text style={{ color: '#6B7280', fontSize: 11, marginBottom: 6 }}>{new Date(m.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
-                            <Text style={{ color: '#9CA3AF', fontSize: 13, lineHeight: 20 }} numberOfLines={3}>{m.content}</Text>
+
+            {loading ? (
+                <ActivityIndicator color={COLORS.primary} style={{ flex: 1 }} />
+            ) : (
+                <FlatList
+                    ref={flatListRef}
+                    data={messages}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    ListEmptyComponent={() => (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, opacity: 0.5 }}>
+                            <MessageSquare size={48} color="#333" />
+                            <Text style={{ color: '#9CA3AF', marginTop: 16, textAlign: 'center', fontSize: 14 }}>No messages yet. Send your first request below!</Text>
                         </View>
-                    ))}
-                </View>
+                    )}
+                    renderItem={({ item }) => {
+                        const isMe = item.sender_id === user?.id;
+                        return (
+                            <View style={{
+                                alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                backgroundColor: isMe ? COLORS.primary : '#1A1A1A',
+                                paddingHorizontal: 16,
+                                paddingVertical: 10,
+                                borderRadius: 18,
+                                maxWidth: '80%',
+                                marginBottom: 12,
+                                borderBottomRightRadius: isMe ? 2 : 18,
+                                borderBottomLeftRadius: isMe ? 18 : 2
+                            }}>
+                                <Text style={{ color: isMe ? '#000' : '#FFF', fontSize: 14, fontWeight: '500' }}>{item.content}</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.5)' : '#4B5563', fontSize: 10 }}>
+                                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </Text>
+                                    {isMe && <Check size={10} color="rgba(0,0,0,0.5)" />}
+                                </View>
+                            </View>
+                        );
+                    }}
+                />
             )}
+
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={100}
+                style={{ borderTopWidth: 1, borderTopColor: '#1A1A1A', backgroundColor: '#050505' }}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 }}>
+                    <TextInput
+                        style={{ 
+                            flex: 1, 
+                            backgroundColor: '#111', 
+                            color: 'white', 
+                            paddingHorizontal: 16, 
+                            paddingVertical: 10, 
+                            borderRadius: 24, 
+                            fontSize: 14,
+                            maxHeight: 100,
+                            borderWidth: 1,
+                            borderColor: '#222'
+                        }}
+                        placeholder="Type your request here..."
+                        placeholderTextColor="#4B5563"
+                        value={newMessage}
+                        onChangeText={setNewMessage}
+                        multiline
+                    />
+                    <Pressable 
+                        onPress={sendMessage}
+                        disabled={!newMessage.trim() || sending}
+                        style={{ 
+                            width: 44, 
+                            height: 44, 
+                            borderRadius: 22, 
+                            backgroundColor: COLORS.primary, 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            opacity: newMessage.trim() ? 1 : 0.4,
+                            elevation: 4,
+                            shadowColor: COLORS.primary,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 4
+                        }}
+                    >
+                        {sending ? <ActivityIndicator color="#000" size="small" /> : <Send size={20} color="black" />}
+                    </Pressable>
+                </View>
+            </KeyboardAvoidingView>
+        </View>
+    );
+}
+
+// ── REQUEST CHAT MODAL ──────────────────────────────────────────────────────
+function RequestChatModal({ requestId, onClose }: { requestId: string | null; onClose: () => void }) {
+    const { user } = useAuth();
+    const [messages, setMessages] = React.useState<any[]>([]);
+    const [newMessage, setNewMessage] = React.useState('');
+    const [loading, setLoading] = React.useState(true);
+    const [sending, setSending] = React.useState(false);
+    const flatListRef = React.useRef<FlatList>(null);
+
+    React.useEffect(() => {
+        if (!requestId) return;
+        
+        const fetchMessages = async () => {
+            const { data } = await supabase
+                .from('booking_messages')
+                .select('*')
+                .eq('booking_request_id', requestId)
+                .order('created_at', { ascending: true });
+            setMessages(data || []);
+            setLoading(false);
+        };
+
+        fetchMessages();
+
+        const channel = supabase
+            .channel(`public:booking_messages:request:${requestId}`)
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'booking_messages', 
+                filter: `booking_request_id=eq.${requestId}` 
+            }, (payload) => {
+                setMessages(prev => [...prev, payload.new]);
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel).catch(console.error); };
+    }, [requestId]);
+
+    const sendMessage = async () => {
+        if (!newMessage.trim() || !user || sending) return;
+        setSending(true);
+        try {
+            const { error } = await supabase.from('booking_messages').insert({
+                booking_request_id: requestId,
+                sender_id: user.id,
+                sender_role: 'client',
+                message: newMessage.trim()
+            });
+            if (error) throw error;
+            setNewMessage('');
+        } catch (e: any) {
+            Alert.alert('Error', e.message);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <Modal visible={!!requestId} animationType="slide" transparent={false}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' }}>
+                    <Pressable onPress={onClose} style={{ padding: 8 }}>
+                        <ArrowLeft size={24} color="white" />
+                    </Pressable>
+                    <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 10 }}>Chat with Admin</Text>
+                </View>
+
+                {loading ? (
+                    <ActivityIndicator color={COLORS.primary} style={{ flex: 1 }} />
+                ) : (
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{ padding: 16 }}
+                        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                        renderItem={({ item }) => {
+                            const isMe = item.sender_role === 'client';
+                            return (
+                                <View style={{
+                                    alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                    backgroundColor: isMe ? COLORS.primary : '#1A1A1A',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 10,
+                                    borderRadius: 18,
+                                    maxWidth: '80%',
+                                    marginBottom: 8,
+                                    borderBottomRightRadius: isMe ? 2 : 18,
+                                    borderBottomLeftRadius: isMe ? 18 : 2
+                                }}>
+                                    <Text style={{ color: isMe ? '#000' : '#FFF', fontSize: 14 }}>{item.message}</Text>
+                                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.4)' : '#666', fontSize: 10, marginTop: 4, textAlign: 'right' }}>
+                                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </Text>
+                                </View>
+                            );
+                        }}
+                    />
+                )}
+
+                <KeyboardAvoidingView 
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ borderTopWidth: 1, borderTopColor: '#1A1A1A' }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#000', gap: 10, paddingBottom: Platform.OS === 'ios' ? 20 : 12 }}>
+                        <TextInput
+                            style={{ flex: 1, backgroundColor: '#111', color: 'white', padding: 12, borderRadius: 20, fontSize: 14 }}
+                            placeholder="Type a message..."
+                            placeholderTextColor="#666"
+                            value={newMessage}
+                            onChangeText={setNewMessage}
+                            multiline
+                        />
+                        <Pressable 
+                            onPress={sendMessage}
+                            disabled={!newMessage.trim() || sending}
+                            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', opacity: newMessage.trim() ? 1 : 0.5 }}
+                        >
+                            {sending ? <ActivityIndicator color="#000" size="small" /> : <Send size={20} color="black" />}
+                        </Pressable>
+                    </View>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </Modal>
+    );
+}
+
+// ── MESSAGES TAB ─────────────────────────────────────────────────────────────
+function ClientMessagesTab({ profile, unreadCount }: { profile: any; unreadCount: number }) {
+    const router = useRouter();
+    return (
+        <View style={{ gap: 20 }}>
+            {/* Main support card */}
+            <Pressable 
+                onPress={() => router.push('/messages' as any)}
+                style={{ 
+                    backgroundColor: 'rgba(204,255,0,0.05)', 
+                    borderWidth: 1, 
+                    borderColor: 'rgba(204,255,0,0.2)', 
+                    borderRadius: 20, 
+                    padding: 24, 
+                    gap: 16 
+                }}
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(204,255,0,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                        <MessageCircle size={28} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '800' }}>Concierge Support</Text>
+                        <Text style={{ color: '#6B7280', fontSize: 14, lineHeight: 20 }}>Chat with our team for assistance with bookings, payments or technical issues.</Text>
+                    </View>
+                </View>
+
+                <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 4 }} />
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                        <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>Team Online</Text>
+                    </View>
+                    
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {unreadCount > 0 && (
+                            <View style={{ backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
+                                <Text style={{ color: '#000', fontSize: 12, fontWeight: '900' }}>{unreadCount} New</Text>
+                            </View>
+                        )}
+                        <ChevronRight size={20} color={COLORS.textDim} />
+                    </View>
+                </View>
+            </Pressable>
+
+            {/* Other help items */}
+            <View style={{ gap: 12 }}>
+                <Text style={{ color: '#4B5563', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginLeft: 4 }}>RESOURCES</Text>
+                {[
+                    { icon: FileText, title: 'FAQs & Guidelines', desc: 'Common questions and act rules' },
+                    { icon: Shield, title: 'Safety & Trust', desc: 'Secure payments and verification' }
+                ].map((item, i) => (
+                    <Pressable key={i} style={{ backgroundColor: '#0F0F0F', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#1A1A1A' }}>
+                        <item.icon size={20} color="#6B7280" />
+                        <View style={{ flex: 1, gap: 1 }}>
+                            <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{item.title}</Text>
+                            <Text style={{ color: '#4B5563', fontSize: 13 }}>{item.desc}</Text>
+                        </View>
+                        <ChevronRight size={18} color="#374151" />
+                    </Pressable>
+                ))}
+            </View>
         </View>
     );
 }

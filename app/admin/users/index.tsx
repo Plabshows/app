@@ -2,16 +2,7 @@
 import { useRouter } from 'expo-router';
 import { CheckCircle, ChevronRight, Search, Shield, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
-} from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../../src/constants/theme';
 import { supabase } from '../../../src/lib/supabase';

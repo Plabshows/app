@@ -9,6 +9,7 @@ import {
     DollarSign,
     Info,
     MapPin,
+    MessageCircle,
     Send,
     User,
     Users,
@@ -41,8 +42,19 @@ export default function RequestDetailScreen() {
     const [extrasAmount, setExtrasAmount] = useState('0');
     const [message, setMessage] = useState('');
 
+    // Chat States
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [sendingMessage, setSendingMessage] = useState(false);
+    const flatListRef = React.useRef<any>(null);
+
     useEffect(() => {
-        if (id) fetchRequest();
+        if (id) {
+            fetchRequest();
+            fetchMessages();
+            const unsubscribe = subscribeToMessages();
+            return unsubscribe;
+        }
     }, [id]);
 
     const fetchRequest = async () => {
@@ -71,6 +83,87 @@ export default function RequestDetailScreen() {
             router.back();
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchMessages = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('booking_messages')
+                .select('*')
+                .eq('booking_request_id', id)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            setMessages(data || []);
+
+            // Mark as read
+            if (data && data.length > 0) {
+                const { data: userData } = await supabase.auth.getUser();
+                if (userData.user) {
+                    await supabase
+                        .from('booking_messages')
+                        .update({ is_read: true })
+                        .eq('booking_request_id', id)
+                        .eq('is_read', false)
+                        .neq('sender_id', userData.user.id);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching messages:', err);
+        }
+    };
+
+    const subscribeToMessages = () => {
+        const channel = supabase
+            .channel(`booking_messages_artist_${id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'booking_messages',
+                filter: `booking_request_id=eq.${id}`
+            }, async (payload) => {
+                const newMsg = payload.new as any;
+                setMessages(prev => [...prev, newMsg]);
+                
+                const { data: userData } = await supabase.auth.getUser();
+                if (newMsg.sender_id !== userData.user?.id) {
+                    await supabase
+                        .from('booking_messages')
+                        .update({ is_read: true })
+                        .eq('id', newMsg.id);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    };
+
+    const handleSendMessage = async () => {
+        if (!newMessage.trim()) return;
+        
+        try {
+            setSendingMessage(true);
+            const { data: userData } = await supabase.auth.getUser();
+            if (!userData.user) throw new Error('Not authenticated');
+
+            const { error } = await supabase
+                .from('booking_messages')
+                .insert({
+                    booking_request_id: id,
+                    sender_id: userData.user.id,
+                    sender_role: 'artist',
+                    message: newMessage.trim()
+                });
+
+            if (error) throw error;
+            setNewMessage('');
+        } catch (err: any) {
+            Alert.alert("Error", err.message);
+        } finally {
+            setSendingMessage(false);
         }
     };
 
@@ -257,7 +350,84 @@ export default function RequestDetailScreen() {
                         </View>
                     </View>
                 )}
+
+                {/* Chat Section */}
+                <View style={styles.chatSection}>
+                    <View style={styles.chatHeader}>
+                        <MessageCircle size={20} color={COLORS.primary} />
+                        <Text style={styles.chatTitle}>Communication History</Text>
+                    </View>
+                    
+                    <View style={styles.chatContainer}>
+                        {messages.length === 0 ? (
+                            <Text style={styles.emptyChat}>No messages yet. Send a quote to start the conversation.</Text>
+                        ) : (
+                            messages.map((msg, index) => {
+                                const isMe = msg.sender_role === 'artist';
+                                const prevMsg = index > 0 ? messages[index - 1] : null;
+                                const showDate = !prevMsg || new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString();
+                                
+                                const dateLabel = () => {
+                                    const d = new Date(msg.created_at);
+                                    const today = new Date();
+                                    const yesterday = new Date();
+                                    yesterday.setDate(today.getDate() - 1);
+                                    if (d.toDateString() === today.toDateString()) return 'Today';
+                                    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+                                    return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                                };
+
+                                return (
+                                    <View key={msg.id}>
+                                        {showDate && (
+                                            <View style={styles.dateSeparator}>
+                                                <View style={styles.dateLine} />
+                                                <Text style={styles.dateText}>{dateLabel()}</Text>
+                                                <View style={styles.dateLine} />
+                                            </View>
+                                        )}
+                                        <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.theirMessage]}>
+                                            <Text style={[styles.messageRole, { color: isMe ? '#000' : COLORS.primary }]}>
+                                                {msg.sender_role.toUpperCase()}
+                                            </Text>
+                                            <Text style={[styles.messageText, { color: isMe ? '#000' : '#FFF' }]}>{msg.message}</Text>
+                                            <View style={styles.messageFooter}>
+                                                <Text style={[styles.messageTime, { color: isMe ? 'rgba(0,0,0,0.45)' : COLORS.textDim }]}>
+                                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                                {isMe && (
+                                                    <Text style={[styles.readStatus, { color: msg.is_read ? '#000' : 'rgba(0,0,0,0.3)' }]}>
+                                                        {msg.is_read ? ' • Read' : ''}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            })
+                        )}
+                    </View>
+                </View>
             </ScrollView>
+
+            {/* Sticky Message Input */}
+            <View style={styles.inputArea}>
+                <TextInput
+                    style={styles.input}
+                    value={newMessage}
+                    onChangeText={setNewMessage}
+                    placeholder="Reply to the client..."
+                    placeholderTextColor={COLORS.textDim}
+                    multiline
+                />
+                <Pressable 
+                    style={[styles.sendButton, (!newMessage.trim() || sendingMessage) && { opacity: 0.5 }]} 
+                    onPress={handleSendMessage}
+                    disabled={!newMessage.trim() || sendingMessage}
+                >
+                    {sendingMessage ? <ActivityIndicator size="small" color="black" /> : <Send size={20} color="black" />}
+                </Pressable>
+            </View>
 
             {/* Action Buttons */}
             {request.status === 'pending' && (
@@ -505,5 +675,25 @@ const styles = StyleSheet.create({
     totalValue: { fontSize: 22, fontWeight: '900', color: COLORS.primary },
     sendBtn: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 100, alignItems: 'center' },
     sendBtnText: { color: '#000', fontWeight: '900', fontSize: 18 },
-    disabled: { opacity: 0.5 }
+    disabled: { opacity: 0.5 },
+    // Chat Styles
+    chatSection: { marginTop: 24, paddingBottom: 40 },
+    chatHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 15 },
+    chatTitle: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    chatContainer: { paddingBottom: 20 },
+    messageBubble: { padding: 12, borderRadius: 12, maxWidth: '85%', marginBottom: 12 },
+    myMessage: { alignSelf: 'flex-end', backgroundColor: COLORS.primary, borderBottomRightRadius: 2 },
+    theirMessage: { alignSelf: 'flex-start', backgroundColor: '#1A1A1A', borderBottomLeftRadius: 2, borderWidth: 1, borderColor: '#333' },
+    messageRole: { fontSize: 10, fontWeight: '900', marginBottom: 4 },
+    messageText: { fontSize: 14, lineHeight: 20 },
+    messageFooter: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4, gap: 4 },
+    messageTime: { fontSize: 10 },
+    readStatus: { fontSize: 10, fontWeight: '600' },
+    dateSeparator: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+    dateLine: { flex: 1, height: 1, backgroundColor: '#222' },
+    dateText: { color: '#666', fontSize: 11, fontWeight: '700', marginHorizontal: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+    emptyChat: { color: COLORS.textDim, textAlign: 'center', marginTop: 20, fontStyle: 'italic' },
+    inputArea: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#000', borderTopWidth: 1, borderTopColor: '#222', gap: 10, paddingBottom: 30 },
+    input: { flex: 1, backgroundColor: '#111', color: 'white', padding: 12, borderRadius: 12, maxHeight: 100, fontSize: 14 },
+    sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
 });

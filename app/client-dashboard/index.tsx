@@ -9,6 +9,12 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 export default function ClientOverview() {
     const { profile } = useAuth();
     const router = useRouter();
+    
+    // Redirect to the new profile-based dashboard
+    useEffect(() => {
+        router.replace('/(tabs)/profile' as any);
+    }, []);
+
     const [stats, setStats] = useState({ favorites: 0, requests: 0, eventStatus: '' });
     const [loading, setLoading] = useState(true);
 

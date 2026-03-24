@@ -28,6 +28,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
+        storageKey: 'plabshows-auth-token',
+        flowType: 'pkce',
     },
 });
 
