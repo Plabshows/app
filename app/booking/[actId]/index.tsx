@@ -1,14 +1,18 @@
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { supabase } from '@/src/lib/supabase';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import {
+    ArrowLeft,
     ChevronLeft,
     ChevronRight,
-    Zap
+    Zap,
+    Calendar as CalendarIcon,
+    X
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
     ActivityIndicator,
@@ -74,6 +78,16 @@ export default function BookingWizard() {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [dateInput, setDateInput] = useState('');
+    const [showCalendar, setShowCalendar] = useState(false);
+
+    // Color helpers for "red if wrong"
+    const getBorderColor = (field: string) => {
+        return errors[field as keyof BookingFormData] ? (COLORS.error || '#ff4444') : 'rgba(255,255,255,0.1)';
+    };
+
+    const getBgColor = (field: string) => {
+        return errors[field as keyof BookingFormData] ? 'rgba(255, 68, 68, 0.05)' : COLORS.surface;
+    };
 
     const { control, handleSubmit, formState: { errors }, watch, setValue, getValues } = useForm<BookingFormData>({
         resolver: zodResolver(bookingSchema),
@@ -98,6 +112,14 @@ export default function BookingWizard() {
     const selectedEventType = watch('event_type');
     const applyToAll = watch('apply_to_all_dates');
     const consent = watch('consent');
+
+    const markedDates = useMemo(() => {
+        const marked: any = {};
+        selectedDates.forEach(d => {
+            marked[d] = { selected: true, selectedColor: COLORS.primary, selectedTextColor: '#000' };
+        });
+        return marked;
+    }, [selectedDates]);
 
     const nextStep = () => setStep(prev => Math.min(prev + 1, 9));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
@@ -130,22 +152,22 @@ export default function BookingWizard() {
         }));
 
         if (!data.event_dates || data.event_dates.length === 0) {
-            return Alert.alert('\u274c Missing', 'Please select at least one date (Step 1).');
+            return Alert.alert('\u274c Missing Info', 'Please select at least one date to proceed.');
         }
         if (!data.location_text || data.location_text.length < 2) {
-            return Alert.alert('\u274c Missing', 'Please enter a location (Step 2).');
+            return Alert.alert('\u274c Missing Info', 'Please tell us where the event will be held.');
         }
         if (!data.event_type) {
-            return Alert.alert('\u274c Missing', 'Please select an event type (Step 4).');
+            return Alert.alert('\u274c Missing Info', 'What kind of event are you planning?');
         }
         if (!data.guests_count) {
-            return Alert.alert('\u274c Missing', 'Please enter a guest count (Step 5).');
+            return Alert.alert('\u274c Missing Info', 'Approximately how many guests are you expecting?');
         }
         if (!data.client_email || !data.client_email.includes('@')) {
-            return Alert.alert('\u274c Missing', 'Please enter your email (Step 8).');
+            return Alert.alert('\u274c Missing Info', 'We need your email to send you the details.');
         }
         if (!data.consent) {
-            return Alert.alert('\u274c Consent', 'Please accept the terms at the bottom of this page (Step 9).');
+            return Alert.alert('\u274c Terms', 'Please accept the terms to submit your request.');
         }
 
         await onSubmit(data);
@@ -353,48 +375,67 @@ export default function BookingWizard() {
             case 1:
                 return (
                     <View style={styles.stepContainer}>
-                        <Text style={styles.stepTitle}>When is your event?</Text>
+                        <Text style={styles.stepTitle}>
+                            {actId === 'event' ? 'Create Event Brief' : 'When is your event?'}
+                        </Text>
                         <Text style={styles.stepSubtitle}>Select one or more dates</Text>
-                        <View style={styles.inputGroup}>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                                <TextInput
-                                    style={[styles.input, { flex: 1 }]}
-                                    placeholder="YYYY-MM-DD (e.g. 2025-09-20)"
-                                    placeholderTextColor="#666"
-                                    value={dateInput}
-                                    onChangeText={setDateInput}
-                                    onSubmitEditing={() => {
-                                        if (dateInput && !selectedDates.includes(dateInput)) {
-                                            setValue('event_dates', [...selectedDates, dateInput]);
-                                            setDateInput('');
+                        
+                        <Pressable 
+                            style={[
+                                styles.calendarToggle, 
+                                { borderColor: getBorderColor('event_dates'), backgroundColor: getBgColor('event_dates') }
+                            ]}
+                            onPress={() => setShowCalendar(!showCalendar)}
+                        >
+                            <CalendarIcon size={20} color={COLORS.primary} />
+                            <Text style={styles.calendarToggleText}>
+                                {selectedDates.length > 0 
+                                    ? `${selectedDates.length} date(s) selected` 
+                                    : 'Choose dates from calendar'}
+                            </Text>
+                            <ChevronRight size={20} color={COLORS.textDim} style={{ transform: [{ rotate: showCalendar ? '90deg' : '0deg' }] }} />
+                        </Pressable>
+
+                        {showCalendar && (
+                            <View style={styles.calendarContainer}>
+                                <Calendar
+                                    theme={{
+                                        calendarBackground: '#111',
+                                        textSectionTitleColor: '#fff',
+                                        selectedDayBackgroundColor: COLORS.primary,
+                                        selectedDayTextColor: '#000',
+                                        todayTextColor: COLORS.primary,
+                                        dayTextColor: '#fff',
+                                        textDisabledColor: '#444',
+                                        monthTextColor: '#fff',
+                                        indicatorColor: COLORS.primary,
+                                        arrowColor: COLORS.primary,
+                                    }}
+                                    markedDates={markedDates}
+                                    onDayPress={(day) => {
+                                        const dateString = day.dateString;
+                                        if (selectedDates.includes(dateString)) {
+                                            setValue('event_dates', selectedDates.filter(d => d !== dateString));
+                                        } else {
+                                            setValue('event_dates', [...selectedDates, dateString]);
                                         }
                                     }}
                                 />
+                            </View>
+                        )}
+
+                        <View style={styles.dateChips}>
+                            {selectedDates.map(d => (
                                 <Pressable
-                                    style={{ backgroundColor: COLORS.primary, paddingHorizontal: 16, borderRadius: 12, justifyContent: 'center' }}
-                                    onPress={() => {
-                                        if (dateInput && !selectedDates.includes(dateInput)) {
-                                            setValue('event_dates', [...selectedDates, dateInput]);
-                                            setDateInput('');
-                                        }
-                                    }}
+                                    key={d}
+                                    style={styles.dateChip}
+                                    onPress={() => setValue('event_dates', selectedDates.filter(x => x !== d))}
                                 >
-                                    <Text style={{ color: '#000', fontWeight: '700' }}>Add</Text>
+                                    <Text style={styles.dateChipText}>{d} <X size={12} color={COLORS.text} /></Text>
                                 </Pressable>
-                            </View>
-                            <View style={styles.dateChips}>
-                                {selectedDates.map(d => (
-                                    <Pressable
-                                        key={d}
-                                        style={styles.dateChip}
-                                        onPress={() => setValue('event_dates', selectedDates.filter(x => x !== d))}
-                                    >
-                                        <Text style={styles.dateChipText}>{d} ✕</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                            {errors.event_dates && <Text style={styles.errorText}>{errors.event_dates.message}</Text>}
+                            ))}
                         </View>
+                        {errors.event_dates && <Text style={styles.errorText}>{errors.event_dates.message}</Text>}
                     </View>
                 );
             case 2:
@@ -407,7 +448,7 @@ export default function BookingWizard() {
                             name="location_text"
                             render={({ field: { onChange, value } }) => (
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { borderColor: getBorderColor('location_text'), backgroundColor: getBgColor('location_text') }]}
                                     placeholder="e.g. Burj Al Arab, Dubai"
                                     placeholderTextColor="#666"
                                     value={value}
@@ -438,7 +479,7 @@ export default function BookingWizard() {
                             name="start_time"
                             render={({ field: { onChange, value } }) => (
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { borderColor: getBorderColor('start_time'), backgroundColor: getBgColor('start_time') }]}
                                     placeholder="e.g. 20:00"
                                     placeholderTextColor="#666"
                                     value={value}
@@ -504,7 +545,7 @@ export default function BookingWizard() {
                             name="guests_count"
                             render={({ field: { onChange, value } }) => (
                                 <TextInput
-                                    style={styles.input}
+                                    style={[styles.input, { borderColor: getBorderColor('guests_count'), backgroundColor: getBgColor('guests_count') }]}
                                     placeholder="e.g. 150"
                                     placeholderTextColor="#666"
                                     keyboardType="number-pad"
@@ -549,7 +590,11 @@ export default function BookingWizard() {
                             name="notes"
                             render={({ field: { onChange, value } }) => (
                                 <TextInput
-                                    style={[styles.input, styles.textArea]}
+                                    style={[
+                                        styles.input, 
+                                        styles.textArea,
+                                        { borderColor: getBorderColor('notes'), backgroundColor: getBgColor('notes') }
+                                    ]}
                                     placeholder="Describe your event, stage setup, special requests…"
                                     placeholderTextColor="#666"
                                     multiline
@@ -575,7 +620,7 @@ export default function BookingWizard() {
                                 name="client_email"
                                 render={({ field: { onChange, value } }) => (
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { borderColor: getBorderColor('client_email'), backgroundColor: getBgColor('client_email') }]}
                                         placeholder="your@email.com"
                                         placeholderTextColor="#666"
                                         keyboardType="email-address"
@@ -595,7 +640,7 @@ export default function BookingWizard() {
                                 name="client_phone"
                                 render={({ field: { onChange, value } }) => (
                                     <TextInput
-                                        style={styles.input}
+                                        style={[styles.input, { borderColor: getBorderColor('client_phone'), backgroundColor: getBgColor('client_phone') }]}
                                         placeholder="+971..."
                                         placeholderTextColor="#666"
                                         keyboardType="phone-pad"
@@ -607,11 +652,11 @@ export default function BookingWizard() {
                         </View>
 
                         <Pressable
-                            style={styles.consentRow}
+                            style={[styles.consentRow, errors.consent && { borderColor: COLORS.error || '#ff4444', borderWidth: 1, padding: 8, borderRadius: 8 }]}
                             onPress={() => setValue('consent', !consent)}
                         >
-                            <View style={[styles.checkbox, consent && styles.checkboxActive]} />
-                            <Text style={styles.consentText}>I agree to be contacted regarding this request.</Text>
+                            <View style={[styles.checkbox, consent && styles.checkboxActive, errors.consent && { borderColor: COLORS.error || '#ff4444' }]} />
+                            <Text style={[styles.consentText, errors.consent && { color: COLORS.error || '#ff4444' }]}>I agree to be contacted regarding this request.</Text>
                         </Pressable>
                         <View style={{ height: 100 }} />
                     </View>
@@ -623,33 +668,51 @@ export default function BookingWizard() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
+            <Stack.Screen 
+                options={{ 
+                    headerShown: true,
+                    headerTitle: actId === 'event' ? 'Create Event Brief' : 'Booking Request',
+                    headerStyle: { backgroundColor: COLORS.background },
+                    headerTintColor: '#FFF',
+                    headerTitleStyle: { fontWeight: '900', fontSize: 17 },
+                    headerLeft: () => (
+                        <Pressable onPress={() => router.back()} style={{ marginLeft: -10, padding: 10 }}>
+                            <ChevronLeft size={24} color="#FFF" />
+                        </Pressable>
+                    )
+                }} 
+            />
+            <KeyboardAvoidingView 
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
                 <View style={styles.header}>
                     <Pressable onPress={() => step === 1 ? router.back() : prevStep()} style={styles.backButton}>
-                        <ChevronLeft size={24} color={COLORS.text} />
+                        <ArrowLeft size={24} color={step === 1 ? 'rgba(255,255,255,0.1)' : '#FFF'} />
                     </Pressable>
                     <View style={styles.progressContainer}>
                         <View style={[styles.progressBar, { width: `${(step / 9) * 100}%` }]} />
                     </View>
-                    <Text style={styles.stepIndicator}>{step}/9</Text>
+                    <Text style={styles.stepIndicator}>{`STEP ${step} OF 9`}</Text>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                >
                     {renderStep()}
                 </ScrollView>
 
                 <View style={styles.footer}>
                     {step < 9 ? (
                         <Pressable style={styles.nextButton} onPress={nextStep}>
-                            <Text style={styles.nextButtonText}>Next</Text>
+                            <Text style={styles.nextButtonText}>Continue</Text>
                             <ChevronRight size={20} color="#000" />
                         </Pressable>
                     ) : (
-                        <Pressable
-                            style={[styles.submitButton, isSubmitting && styles.disabled]}
+                        <Pressable 
+                            style={[styles.submitButton, isSubmitting && styles.disabled]} 
                             onPress={submitBooking}
                             disabled={isSubmitting}
                         >
@@ -696,8 +759,9 @@ const styles = StyleSheet.create({
     },
     stepIndicator: {
         color: COLORS.textDim,
-        fontWeight: 'bold',
-        fontSize: 12,
+        fontWeight: '800',
+        fontSize: 13,
+        fontVariant: ['tabular-nums'],
     },
     content: {
         padding: SPACING.xl,
@@ -707,10 +771,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     stepTitle: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: '900',
         color: COLORS.text,
-        marginBottom: 8,
+        marginBottom: 10,
+        letterSpacing: -0.5,
+        lineHeight: 38,
     },
     stepSubtitle: {
         fontSize: 16,
@@ -741,10 +807,11 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: SPACING.xl,
+        paddingTop: SPACING.l,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.05)',
-        marginBottom: 120, // Lift VERY HIGH above any potential menus
+        borderTopColor: 'rgba(255,255,255,0.08)',
         backgroundColor: COLORS.background,
+        paddingBottom: Platform.OS === 'ios' ? 100 : 80, // High enough to clear any bottom tab or safe area
     },
     nextButton: {
         backgroundColor: COLORS.primary,
@@ -794,6 +861,33 @@ const styles = StyleSheet.create({
     dateChipText: {
         color: COLORS.primary,
         fontWeight: 'bold',
+        fontSize: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    calendarToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        gap: 12,
+        marginBottom: 16,
+    },
+    calendarToggleText: {
+        flex: 1,
+        color: COLORS.text,
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    calendarContainer: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        marginBottom: 16,
     },
     switchRow: {
         flexDirection: 'row',

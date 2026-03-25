@@ -48,6 +48,11 @@ export default function DiscoverScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // AI Search State
+  const [isAILoading, setIsAILoading] = useState(false);
+  const [aiResults, setAiResults] = useState<any[] | null>(null);
+  const [aiCategories, setAiCategories] = useState<string[]>([]);
+
   // --- FETCH NEWEST ARTISTS ---
   useEffect(() => {
     const fetchNewArtists = async () => {
@@ -84,6 +89,34 @@ export default function DiscoverScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, activeCategory]);
 
+  const handleAISearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsAILoading(true);
+    setAiResults(null);
+    setAiCategories([]);
+    try {
+      const response = await fetch('/api/ai-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt: searchQuery })
+      });
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      setAiResults(data.results || []);
+      setAiCategories(data.categories || []);
+      
+    } catch (error) {
+      console.error("AI Search Error:", error);
+      alert("Error en la búsqueda con IA. Prueba de nuevo.");
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
   // Featured: show all acts (sorted by most recently added)
   const featuredActs = React.useMemo(() => acts.slice(0, 20), [acts]);
 
@@ -117,9 +150,13 @@ export default function DiscoverScreen() {
         />
       </View>
 
-      <Pressable style={styles.aiButton}>
+      <Pressable 
+        style={[styles.aiButton, (isAILoading || !searchQuery.trim()) && { opacity: 0.5 }]} 
+        onPress={handleAISearch} 
+        disabled={isAILoading || !searchQuery.trim()}
+      >
         <Sparkles size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
-        <Text style={styles.aiButtonText}>Search with AI</Text>
+        <Text style={styles.aiButtonText}>{isAILoading ? 'Buscando...' : 'Search with AI'}</Text>
       </Pressable>
 
       <View style={styles.divider} />
@@ -399,6 +436,80 @@ export default function DiscoverScreen() {
     );
   };
 
+  const renderAIResults = () => {
+    if (isAILoading) {
+      return (
+        <View style={[styles.section, { alignItems: 'center', paddingVertical: 40 }]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={{ color: COLORS.text, marginTop: 16, fontSize: 16, fontWeight: 'bold', textAlign: 'center', paddingHorizontal: 20 }}>
+            Analizando tu evento y buscando el mejor talento...
+          </Text>
+        </View>
+      );
+    }
+
+    if (!aiResults) return null;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            AI Match Results
+          </Text>
+          {aiCategories.length > 0 && (
+             <Text style={styles.seeAll}>Matched: {aiCategories.join(', ')}</Text>
+          )}
+        </View>
+
+        {aiResults.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ghost size={48} color={COLORS.textDim} />
+            <Text style={styles.emptyText}>No artists matched your request perfectly.</Text>
+            <Pressable onPress={() => { setAiResults(null); }}>
+              <Text style={styles.clearText}>Clear AI Search</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View>
+            <FlatList
+              horizontal
+              data={aiResults}
+              keyExtractor={item => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: SPACING.m }}
+              renderItem={({ item }) => (
+                <Pressable style={styles.featuredCard} onPress={() => router.push(`/act/${item.id}`)}>
+                  <Image source={{ uri: getArtistImage(item) }} style={styles.featuredImage} />
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
+                    style={styles.featuredGradient}
+                  />
+                  <View style={styles.featuredContent}>
+                    <View style={styles.featuredTopRow}>
+                      <View style={styles.ratingBadge}>
+                        <Sparkles size={10} color={COLORS.background} />
+                        <Text style={styles.ratingText}>AI MATCH</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.featuredTitle} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.featuredCategory}>
+                      {item.categories && item.categories.length > 0 
+                        ? item.categories.join(' • ') 
+                        : item.category}
+                    </Text>
+                    <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
+                  </View>
+                </Pressable>
+              )}
+            />
+            <Pressable style={{ alignItems: 'center', marginTop: 16 }} onPress={() => setAiResults(null)}>
+              <Text style={styles.clearText}>Clear AI Match</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -409,6 +520,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingBottom: 100, paddingTop: SPACING.s }}
       >
         {renderAgencyHero()}
+        {renderAIResults()}
         {renderTrustBar()}
         {renderCuratedSolutions()}
         {renderFeatured()}

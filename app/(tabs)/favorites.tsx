@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
         right: 0,
         backgroundColor: 'rgba(0,0,0,0.9)',
         padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 100, // Increased to clear bottom navigation menu
         borderTopWidth: 1,
         borderTopColor: '#222',
     },

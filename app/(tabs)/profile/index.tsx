@@ -2,8 +2,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
     ArrowLeft, Bell, Calendar, Camera, Check, ChevronRight, Clock, CreditCard, Edit2,
-    FileText, Globe, Heart, HelpCircle, Image as ImageIcon, LogOut, MapPin, MessageCircle, MessageSquare,
-    Send, Settings, Shield, Star, Upload, User, X, Zap
+    FileText, Globe, Heart, HelpCircle, Image as ImageIcon, LayoutDashboard, LogOut, MapPin, MessageCircle, MessageSquare,
+    Search, Send, Settings, Shield, Star, Sparkles, Upload, User, X, Zap
 } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal } from 'react-native';
@@ -613,7 +613,7 @@ function ClientProfileScreen({ profile, router, signOut, unreadCount }: { profil
             </View>
 
             {/* Tab content */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingTop: 8, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingTop: 8, paddingBottom: 180 }} showsVerticalScrollIndicator={false}>
                 {tab === 'Overview' && <ClientOverviewTab profile={profile} router={router} setTab={setTab} signOut={signOut} />}
                 {tab === 'My Event' && <ClientMyEventTab profile={profile} />}
                 {tab === 'Favorites' && <ClientFavoritesTab profile={profile} router={router} refreshAuth={refreshAuth} />}
@@ -644,13 +644,17 @@ function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any;
         <View style={{ gap: 24 }}>
             {/* Stats */}
             <View style={{ flexDirection: 'row', gap: 10 }}>
-                {[{ label: 'Favorites', value: `${favCount}`, emoji: '♥', tab: 'Favorites' },
-                  { label: 'Requests', value: `${requests.length}`, emoji: '📨', tab: 'Requests' },
-                  { label: 'Event', value: event?.status || 'None', emoji: '📋', tab: 'My Event' }].map(s => (
-                    <Pressable key={s.label} onPress={() => setTab(s.tab)} style={{ flex: 1, backgroundColor: '#0F0F0F', borderRadius: 16, borderWidth: 1, borderColor: '#1A1A1A', padding: 14 }}>
-                        <Text style={{ fontSize: 18, marginBottom: 6 }}>{s.emoji}</Text>
-                        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800', marginBottom: 2 }}>{s.value}</Text>
-                        <Text style={{ color: '#6B7280', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' }}>{s.label}</Text>
+                {[
+                    { label: 'Favorites', value: `${favCount}`, icon: Heart, color: '#FF3B30', tab: 'Favorites' as const },
+                    { label: 'Requests', value: `${requests.length}`, icon: Send, color: '#007AFF', tab: 'Booking Requests' as const },
+                    { label: 'Event', value: event?.status || 'None', icon: FileText, color: COLORS.primary, tab: 'My Event' as const }
+                ].map(s => (
+                    <Pressable key={s.label} onPress={() => setTab(s.tab)} style={{ flex: 1, backgroundColor: '#0F0F0F', borderRadius: 20, borderWidth: 1, borderColor: '#1A1A1A', padding: 16, alignItems: 'flex-start' }}>
+                        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: s.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                            <s.icon size={18} color={s.color} />
+                        </View>
+                        <Text style={{ color: '#FFF', fontSize: 22, fontWeight: '800', marginBottom: 2 }}>{s.value}</Text>
+                        <Text style={{ color: '#6B7280', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '700' }}>{s.label}</Text>
                     </Pressable>
                 ))}
             </View>
@@ -663,9 +667,14 @@ function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any;
                         <View><Text style={{ color: '#FFF', fontWeight: '700', fontSize: 15, marginBottom: 3 }}>{event.title}</Text><Text style={{ color: '#6B7280', fontSize: 13 }}>{event.location || ''}{event.event_date ? ` · ${event.event_date}` : ''}</Text></View>
                         <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '22', borderColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '44', borderWidth: 1 }}><Text style={{ color: event.status === 'ready' ? '#10B981' : '#F59E0B', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>{event.status}</Text></View>
                       </Pressable>
-                    : <Pressable onPress={() => setTab('My Event')} style={{ backgroundColor: '#0F0F0F', borderRadius: 14, borderWidth: 1, borderColor: '#1A1A1A', padding: 16, alignItems: 'center' }}>
-                        <Text style={{ color: '#6B7280', fontSize: 14, marginBottom: 6 }}>No event yet</Text>
-                        <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '700' }}>+ Create Event Brief</Text>
+                    : <Pressable onPress={() => router.push('/booking/event' as any)} style={{ backgroundColor: 'rgba(204,255,0,0.04)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(204,255,0,0.15)', padding: 24, alignItems: 'center', gap: 10 }}>
+                        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(204,255,0,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                            <Sparkles size={24} color={COLORS.primary} />
+                        </View>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16, marginBottom: 4 }}>No event yet</Text>
+                            <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: '700' }}>+ Create Event Brief</Text>
+                        </View>
                       </Pressable>}
             </View>
 
@@ -689,12 +698,11 @@ function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any;
                 <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 15 }}>ACCOUNT</Text>
                 
                 {[
-                    { title: 'Explore Artists', icon: '🎤', onPress: () => router.replace('/(tabs)') },
-                    { title: 'My Favorites', icon: '♥', onPress: () => setTab('Favorites') },
-                    { title: 'My Dashboard', icon: '📋', onPress: () => setTab('Overview') }, // Keep link to itself but it's redundant, or set to 'My Event'
-                    { title: 'Contact Admin', icon: '💬', onPress: () => setTab('Messages') },
-                    { title: 'Settings', icon: '⚙️', onPress: () => setTab('Settings') },
-                    { title: 'Log Out', icon: '🚪', onPress: signOut, color: '#EF4444' },
+                    { title: 'Explore Artists', icon: Search, onPress: () => router.replace('/(tabs)') },
+                    { title: 'My Favorites', icon: Heart, onPress: () => setTab('Favorites') },
+                    { title: 'Contact Admin', icon: MessageSquare, onPress: () => setTab('Support Chat') },
+                    { title: 'Settings', icon: Settings, onPress: () => setTab('Settings') },
+                    { title: 'Log Out', icon: LogOut, onPress: signOut, color: '#EF4444' },
                 ].map((item: any, idx) => (
                     <Pressable 
                         key={idx} 
@@ -712,7 +720,9 @@ function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any;
                         }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                            <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+                            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: (item.color || COLORS.primary) + '15', alignItems: 'center', justifyContent: 'center' }}>
+                                <item.icon size={18} color={item.color || COLORS.primary} />
+                            </View>
                             <Text style={{ color: item.color || '#FFF', fontSize: 15, fontWeight: '600' }}>{item.title}</Text>
                         </View>
                         <ChevronRight size={18} color="#4B5563" />
@@ -723,84 +733,97 @@ function ClientOverviewTab({ profile, router, setTab, signOut }: { profile: any;
     );
 }
 
-// ── MY EVENT TAB ─────────────────────────────────────────────────────────────
-const EVENT_TYPES_C = ['Private Party', 'Corporate Event', 'Wedding', 'Festival', 'Brand Activation', 'Gala', 'Birthday', 'Other'];
-const BUDGET_RANGES_C = ['Under €5k', '€5k–€15k', '€15k–€30k', '€30k–€50k', '€50k+'];
 function ClientMyEventTab({ profile }: { profile: any }) {
     const [event, setEvent] = React.useState<any>(null);
-    const [editing, setEditing] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
-    const [saving, setSaving] = React.useState(false);
-    const [form, setForm] = React.useState({ title: '', event_type: '', location: '', event_date: '', guest_count: '', budget_range: '', notes: '', status: 'draft' });
+    const router = useRouter();
+
     const load = React.useCallback(async () => {
         const { data } = await supabase.from('client_events').select('*').eq('client_id', profile.id).maybeSingle();
         setEvent(data);
-        if (data) setForm({ title: data.title||'', event_type: data.event_type||'', location: data.location||'', event_date: data.event_date||'', guest_count: data.guest_count?.toString()||'', budget_range: data.budget_range||'', notes: data.notes||'', status: data.status||'draft' });
         setLoading(false);
     }, [profile.id]);
-    React.useEffect(() => { load(); }, [load]);
-    const save = async () => {
-        if (!form.title.trim()) { Alert.alert('Required', 'Add an event title.'); return; }
-        setSaving(true);
-        const payload = { client_id: profile.id, title: form.title, event_type: form.event_type, location: form.location, event_date: form.event_date||null, guest_count: form.guest_count ? parseInt(form.guest_count) : null, budget_range: form.budget_range, notes: form.notes, status: form.status, updated_at: new Date().toISOString() };
-        const { error } = event ? await supabase.from('client_events').update(payload).eq('id', event.id) : await supabase.from('client_events').insert(payload);
-        
-        if (!error) { 
-            // ✨ NEW: Notify Admin about the Event Brief
-            await supabase.from('messages').insert({
-                sender_id: profile.id,
-                receiver_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833',
-                content: `[EVENT BRIEF] ${event ? 'Updated' : 'New'} brief: "${form.title}" for ${form.event_date || 'TBD'}. Status: ${form.status}`,
-                status: 'unread'
-            });
 
-            setEditing(false); 
-            load(); 
-            Alert.alert('Saved ✓', 'Your event brief has been saved and our team has been notified.'); 
-        }
-        else Alert.alert('Error', error.message);
-        setSaving(false);
-    };
-    const fi = (k: string) => (v: string) => setForm((f: any) => ({ ...f, [k]: v }));
+    React.useEffect(() => { load(); }, [load]);
+
     if (loading) return <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />;
+
     return (
         <View style={{ gap: 16 }}>
-            {event && !editing ? (
-                <View style={{ backgroundColor: '#0F0F0F', borderRadius: 18, borderWidth: 1, borderColor: '#1A1A1A', padding: 20 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
-                        <View><Text style={{ color: '#FFF', fontWeight: '800', fontSize: 18, marginBottom: 4 }}>{event.title}</Text>{event.event_type && <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '600' }}>{event.event_type}</Text>}</View>
-                        <View style={{ paddingHorizontal: 10, paddingVertical: 4, height: 28, borderRadius: 20, backgroundColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '22', borderWidth: 1, borderColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '44' }}><Text style={{ color: event.status === 'ready' ? '#10B981' : '#F59E0B', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>{event.status}</Text></View>
+            {event ? (
+                <View style={{ backgroundColor: '#0F0F0F', borderRadius: 20, borderWidth: 1, borderColor: '#1A1A1A', padding: 24 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <View>
+                            <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 22, marginBottom: 6 }}>{event.title}</Text>
+                            {event.event_type && (
+                                <View style={{ backgroundColor: 'rgba(204,255,0,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
+                                    <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '700' }}>{event.event_type}</Text>
+                                </View>
+                            )}
+                        </View>
+                        <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '22', borderWidth: 1, borderColor: (event.status === 'ready' ? '#10B981' : '#F59E0B') + '44', height: 28 }}>
+                            <Text style={{ color: event.status === 'ready' ? '#10B981' : '#F59E0B', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>{event.status}</Text>
+                        </View>
                     </View>
-                    {[['📍', event.location], ['📅', event.event_date], ['👥', event.guest_count ? `${event.guest_count} guests` : null], ['💰', event.budget_range]].filter(([,v]) => v).map(([icon, val]) => (
-                        <Text key={String(val)} style={{ color: '#9CA3AF', fontSize: 14, marginBottom: 6 }}>{icon}  {val}</Text>
-                    ))}
-                    {event.notes && <Text style={{ color: '#6B7280', fontSize: 13, fontStyle: 'italic', marginTop: 8, lineHeight: 20 }}>"{event.notes}"</Text>}
-                    <Pressable onPress={() => setEditing(true)} style={{ marginTop: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(204,255,0,0.3)', backgroundColor: 'rgba(204,255,0,0.05)', alignItems: 'center' }}>
-                        <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Edit Event</Text>
+
+                    <View style={{ gap: 12, marginBottom: 24 }}>
+                        {[
+                            { icon: MapPin, val: event.location, label: 'Location' },
+                            { icon: Calendar, val: event.event_date, label: 'Date' },
+                            { icon: User, val: event.guest_count ? `${event.guest_count} guests` : null, label: 'Guests' },
+                            { icon: CreditCard, val: event.budget_range, label: 'Budget' }
+                        ].filter(s => s.val).map((item, idx) => (
+                            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#171717', alignItems: 'center', justifyContent: 'center' }}>
+                                    <item.icon size={16} color="#6B7280" />
+                                </View>
+                                <View>
+                                    <Text style={{ color: '#6B7280', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{item.label}</Text>
+                                    <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600' }}>{item.val}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+
+                    {event.notes && (
+                        <View style={{ backgroundColor: '#171717', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                            <Text style={{ color: '#6B7280', fontSize: 13, fontStyle: 'italic', lineHeight: 20 }}>"{event.notes}"</Text>
+                        </View>
+                    )}
+
+                    <Pressable 
+                        onPress={() => router.push('/booking/event' as any)} 
+                        style={{ 
+                            paddingVertical: 16, 
+                            borderRadius: 16, 
+                            backgroundColor: COLORS.primary, 
+                            alignItems: 'center',
+                            shadowColor: COLORS.primary,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 8,
+                            elevation: 4
+                        }}
+                    >
+                        <Text style={{ color: '#000', fontWeight: '900', fontSize: 16 }}>Update Brief via Wizard</Text>
                     </Pressable>
                 </View>
-            ) : !editing ? (
-                <Pressable onPress={() => setEditing(true)} style={{ backgroundColor: '#0F0F0F', borderRadius: 18, borderWidth: 1, borderColor: '#1A1A1A', padding: 40, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 40, marginBottom: 14 }}>📋</Text>
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16, marginBottom: 6 }}>No event yet</Text>
-                    <Text style={{ color: COLORS.primary, fontWeight: '700' }}>+ Create Event Brief</Text>
-                </Pressable>
             ) : (
-                <View style={{ backgroundColor: '#0F0F0F', borderRadius: 18, borderWidth: 1, borderColor: '#1A1A1A', padding: 20, gap: 16 }}>
-                    {[['Event Title *', 'title', 'e.g. Summer Gala 2025'], ['Location', 'location', 'Ibiza, Dubai, Mykonos...'], ['Date', 'event_date', 'YYYY-MM-DD'], ['Guest Count', 'guest_count', '200']].map(([label, key, placeholder]) => (
-                        <View key={key}>
-                            <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
-                            <TextInput style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 15 }} value={(form as any)[key]} onChangeText={fi(key)} placeholder={placeholder} placeholderTextColor="#4B5563" keyboardType={key === 'guest_count' ? 'numeric' : 'default'} />
-                        </View>
-                    ))}
-                    <View><Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Event Type</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{EVENT_TYPES_C.map(t => <Pressable key={t} onPress={() => fi('event_type')(t)} style={{ paddingVertical: 7, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: form.event_type===t ? COLORS.primary : '#2A2A2A', backgroundColor: form.event_type===t ? 'rgba(204,255,0,0.1)' : '#171717' }}><Text style={{ color: form.event_type===t ? COLORS.primary : '#6B7280', fontSize: 12, fontWeight: form.event_type===t ? '700' : '500' }}>{t}</Text></Pressable>)}</View></View>
-                    <View><Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Budget</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{BUDGET_RANGES_C.map(b => <Pressable key={b} onPress={() => fi('budget_range')(b)} style={{ paddingVertical: 7, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: form.budget_range===b ? COLORS.primary : '#2A2A2A', backgroundColor: form.budget_range===b ? 'rgba(204,255,0,0.1)' : '#171717' }}><Text style={{ color: form.budget_range===b ? COLORS.primary : '#6B7280', fontSize: 12, fontWeight: form.budget_range===b ? '700' : '500' }}>{b}</Text></Pressable>)}</View></View>
-                    <View><Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Notes / Creative Brief</Text><TextInput style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 14, height: 100, textAlignVertical: 'top' }} value={form.notes} onChangeText={fi('notes')} placeholder="Describe the vibe, theme..." placeholderTextColor="#4B5563" multiline /></View>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                        {event && <Pressable onPress={() => setEditing(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#222', alignItems: 'center' }}><Text style={{ color: '#6B7280', fontWeight: '600' }}>Cancel</Text></Pressable>}
-                        <Pressable onPress={save} disabled={saving} style={{ flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: saving ? 0.6 : 1 }}>{saving ? <ActivityIndicator color="#000" size="small" /> : <Text style={{ color: '#000', fontWeight: '800', fontSize: 15 }}>Save Event</Text>}</Pressable>
+                <Pressable 
+                    onPress={() => router.push('/booking/event' as any)} 
+                    style={{ backgroundColor: '#0F0F0F', borderRadius: 24, borderWidth: 1, borderColor: '#1A1A1A', padding: 60, alignItems: 'center', gap: 16, marginBottom: 120 }}
+                >
+                    <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(204,255,0,0.05)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(204,255,0,0.1)' }}>
+                        <Sparkles size={40} color={COLORS.primary} />
                     </View>
-                </View>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 20, marginBottom: 4 }}>No event yet</Text>
+                        <Text style={{ color: '#6B7280', fontSize: 14, textAlign: 'center', lineHeight: 22 }}>Create your event brief to start receiving tailored artist proposals.</Text>
+                    </View>
+                    <View style={{ backgroundColor: COLORS.primary, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 100, marginTop: 8 }}>
+                        <Text style={{ color: '#000', fontWeight: '900', fontSize: 16 }}>+ Create Event Brief</Text>
+                    </View>
+                </Pressable>
             )}
         </View>
     );
@@ -871,85 +894,13 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
 
 
     // ── submit booking ────────────────────────────────────────────────────────
-    const submitBookings = async () => {
-        if (!eventDate) { Alert.alert('Required', 'Please enter the event date.'); return; }
-        if (!location.trim()) { Alert.alert('Required', 'Please enter the event location.'); return; }
-        if (selectedActs.length === 0) return;
-        setSubmitting(true);
-        try {
-            const rows = selectedActs.map(act => ({
-                client_id: profile.id,
-                act_id: act.id,
-                event_dates: [eventDate],
-                start_time: eventTime || null,
-                location_text: location,
-                event_type: partyType || null,
-                notes: notes || null,
-                status: 'pending',
-                platform_fee_pct: 20,
-                artist_fee: parseFee(act.fee, act.price_guide) > 0 ? parseFee(act.fee, act.price_guide) / 1.2 : null,
-                total_amount: parseFee(act.fee, act.price_guide) || null,
-            }));
-            
-            const { data: inserted, error } = await supabase
-                .from('booking_requests')
-                .insert(rows)
-                .select();
-            
-            if (error) throw error;
-
-            // Also send an initial message for each request in the booking chat
-            if (inserted && inserted.length > 0) {
-                const messageRows = inserted.map(req => ({
-                    booking_request_id: req.id,
-                    sender_id: profile.id,
-                    sender_role: 'client',
-                    message: `Initial Inquiry: I'm interested in booking for a ${partyType || 'event'} on ${eventDate}. ${notes ? '\nNotes: ' + notes : ''}`
-                }));
-                await supabase.from('booking_messages').insert(messageRows);
-
-                // ✨ NEW: Also send a summary message to the Support/Admin Hub (Unified Inbox)
-                const artistNames = selectedActs.map(a => a.name).join(', ');
-                
-                // 1. Client to Admin (Summary of request)
-                await supabase.from('messages').insert({
-                    sender_id: profile.id,
-                    receiver_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
-                    content: `[BOOKING REQUEST] New inquiry for ${artistNames} on ${eventDate}. (Type: ${partyType || 'N/A'})`,
-                    status: 'unread'
-                });
-
-                // 2. Admin to Client (Auto-reply / Notification)
-                await supabase.from('messages').insert({
-                    sender_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
-                    receiver_id: profile.id,
-                    content: `Hello! We've received your booking request for ${artistNames}. Our concierge team will review it and get back to you shortly.`,
-                    status: 'unread'
-                });
-
-                // 3. Admin to Artist(s) (Assignment Notification)
-                const artistMessages = selectedActs.map(act => ({
-                    sender_id: 'cbc605d5-518d-4fab-94e4-3d3cda8cf833', // Central Admin
-                    receiver_id: act.id, // Act ID is the Profile ID (Artist's user_id)
-                    content: `Notification: You have a new booking inquiry for "${act.name}" on ${eventDate}! Check your artist dashboard for details.`,
-                    status: 'unread'
-                }));
-                if (artistMessages.length > 0) {
-                    await supabase.from('messages').insert(artistMessages);
-                }
-            }
-
-            // success: reset
-            setSuccessIds(selectedActs.map(a => a.id));
-            setSelected(new Set());
-            setShowCheckout(false);
-            setEventDate(''); setEventTime(''); setLocation(''); setPartyType(''); setNotes('');
-            // No strict Alert here, we use the successIds banner for better UX
-        } catch (e: any) {
-            Alert.alert('Error', e.message || 'Could not send request.');
-        } finally {
-            setSubmitting(false);
+    const startBooking = () => {
+        if (selected.size === 0) {
+            Alert.alert('No Selection', 'Please select at least one artist to book.');
+            return;
         }
+        const ids = Array.from(selected).join(',');
+        router.push(`/booking/${ids}` as any);
     };
 
     if (loading) return <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />;
@@ -1036,129 +987,22 @@ function ClientFavoritesTab({ profile, router, refreshAuth }: { profile: any; ro
             })}
 
             {/* ── CTA sticky bar ────────────────────────────────────────────── */}
-            {selected.size > 0 && !showCheckout && (
-                <Pressable onPress={() => setShowCheckout(true)} style={{ backgroundColor: COLORS.primary, borderRadius: 16, padding: 18, alignItems: 'center', marginTop: 4 }}>
+            {selected.size > 0 && (
+                <Pressable 
+                    onPress={startBooking} 
+                    style={{ 
+                        backgroundColor: COLORS.primary, 
+                        borderRadius: 16, 
+                        padding: 18, 
+                        alignItems: 'center', 
+                        marginTop: 4,
+                        marginBottom: 120
+                    }}
+                >
                     <Text style={{ color: '#000', fontWeight: '900', fontSize: 16 }}>
                         🎤  Request Booking · {selected.size} artist{selected.size > 1 ? 's' : ''}
                     </Text>
                 </Pressable>
-            )}
-
-            {/* ── INLINE CHECKOUT PANEL ─────────────────────────────────────── */}
-            {showCheckout && (
-                <View style={{ backgroundColor: '#0A0A0A', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(204,255,0,0.25)', padding: 20, gap: 16, marginTop: 4 }}>
-                    {/* Header */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 18 }}>Booking Request</Text>
-                        <Pressable onPress={() => setShowCheckout(false)} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ color: '#6B7280', fontSize: 16 }}>✕</Text>
-                        </Pressable>
-                    </View>
-
-                    {/* Selected artists summary */}
-                    <View style={{ backgroundColor: '#111', borderRadius: 14, padding: 14, gap: 8 }}>
-                        <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Artists selected</Text>
-                        {selectedActs.map(a => (
-                            <View key={a.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Text style={{ color: '#E5E7EB', fontSize: 14, fontWeight: '600' }}>{a.name}</Text>
-                                <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{a.fee ? fmt(parseFee(a.fee)) : a.price_guide || '—'}</Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    {/* Event details */}
-                    <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>Event Details</Text>
-
-                    {/* Date */}
-                    <View>
-                        <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Event Date *</Text>
-                        <TextInput
-                            style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 15 }}
-                            value={eventDate}
-                            onChangeText={setEventDate}
-                            placeholder="YYYY-MM-DD  (e.g. 2025-08-15)"
-                            placeholderTextColor="#4B5563"
-                        />
-                    </View>
-
-                    {/* Time */}
-                    <View>
-                        <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Start Time</Text>
-                        <TextInput
-                            style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 15 }}
-                            value={eventTime}
-                            onChangeText={setEventTime}
-                            placeholder="e.g. 22:00"
-                            placeholderTextColor="#4B5563"
-                        />
-                    </View>
-
-                    {/* Location */}
-                    <View>
-                        <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Location *</Text>
-                        <TextInput
-                            style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 15 }}
-                            value={location}
-                            onChangeText={setLocation}
-                            placeholder="Ibiza, Dubai, Mykonos..."
-                            placeholderTextColor="#4B5563"
-                        />
-                    </View>
-
-                    {/* Party type */}
-                    <View>
-                        <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Event Type</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                            {PARTY_TYPES.map(t => (
-                                <Pressable key={t} onPress={() => setPartyType(t === partyType ? '' : t)} style={{ paddingVertical: 7, paddingHorizontal: 13, borderRadius: 20, borderWidth: 1, borderColor: partyType === t ? COLORS.primary : '#2A2A2A', backgroundColor: partyType === t ? 'rgba(204,255,0,0.1)' : '#171717' }}>
-                                    <Text style={{ color: partyType === t ? COLORS.primary : '#6B7280', fontSize: 12, fontWeight: partyType === t ? '700' : '500' }}>{t}</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Notes */}
-                    <View>
-                        <Text style={{ color: '#9CA3AF', fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Additional Notes</Text>
-                        <TextInput
-                            style={{ backgroundColor: '#171717', borderWidth: 1, borderColor: '#222', borderRadius: 12, padding: 14, color: '#FFF', fontSize: 14, height: 90, textAlignVertical: 'top' }}
-                            value={notes}
-                            onChangeText={setNotes}
-                            placeholder="Set, duration, special requests..."
-                            placeholderTextColor="#4B5563"
-                            multiline
-                        />
-                    </View>
-
-                    {/* ── Price breakdown ──────────────────────────────────── */}
-                    {subtotal > 0 && (
-                        <View style={{ backgroundColor: '#111', borderRadius: 16, padding: 16, gap: 10 }}>
-                            <Text style={{ color: '#4B5563', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Price Breakdown</Text>
-                            {selectedActs.map(a => parseFee(a.fee) > 0 && (
-                                <View key={a.id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{a.name}</Text>
-                                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{fmt(parseFee(a.fee, a.price_guide))}</Text>
-                                </View>
-                            ))}
-                            <View style={{ height: 1, backgroundColor: '#1A1A1A', marginVertical: 4 }} />
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>Total</Text>
-                                <Text style={{ color: COLORS.primary, fontSize: 15, fontWeight: '900' }}>{fmt(total)}</Text>
-                            </View>
-                            <Text style={{ color: '#374151', fontSize: 11, fontStyle: 'italic' }}>No payment today — this is a request. We'll confirm and invoice you.</Text>
-                        </View>
-                    )}
-
-                    {/* Submit buttons */}
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                        <Pressable onPress={() => setShowCheckout(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#222', alignItems: 'center' }}>
-                            <Text style={{ color: '#6B7280', fontWeight: '600' }}>Cancel</Text>
-                        </Pressable>
-                        <Pressable onPress={submitBookings} disabled={submitting} style={{ flex: 2, paddingVertical: 14, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: submitting ? 0.6 : 1 }}>
-                            {submitting ? <ActivityIndicator color="#000" size="small" /> : <Text style={{ color: '#000', fontWeight: '900', fontSize: 15 }}>Confirm Request</Text>}
-                        </Pressable>
-                    </View>
-                </View>
             )}
         </View>
     );

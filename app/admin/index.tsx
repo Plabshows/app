@@ -22,7 +22,8 @@ import {
     User,
     Users,
     Zap,
-    Trash2
+    Trash2,
+    Star
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../src/constants/theme';
@@ -146,7 +147,7 @@ export default function AdminDashboard() {
         else if (activeTab === 'leads') fetchLeads();
         else if (activeTab === 'users') fetchProfiles();
         else if (activeTab === 'acts') fetchAllActs();
-        else if (activeTab === 'bookings') fetchBookings();
+        else if (activeTab === 'bookings' || activeTab === 'inquiries') fetchBookings();
         else if (activeTab === 'reviews') fetchReviews();
         else if (activeTab === 'messages') {
             fetchMessagesData();
@@ -393,7 +394,6 @@ export default function AdminDashboard() {
             console.log("Admin Messages Error:", e);
         } finally {
             setLoading(false);
-            setRefreshing(false);
         }
     };
 
@@ -685,7 +685,7 @@ export default function AdminDashboard() {
     const renderStatusUpdateCard = (item: any) => {
         try {
             const data = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-            if (!data) return null;
+            if (!data || !data.new_status) return null;
 
             return (
                 <View style={{
@@ -1035,8 +1035,20 @@ export default function AdminDashboard() {
     };
 
     const renderReviewItem = ({ item }: { item: Review }) => (
-        // ... (truncated)
-        <View />
+        <View style={styles.card}>
+            <View style={styles.cardContent}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={styles.cardTitle}>{item.client_name}</Text>
+                    <View style={{ flexDirection: 'row', gap: 2 }}>
+                        {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={14} color={i < item.rating ? COLORS.primary : '#333'} fill={i < item.rating ? COLORS.primary : 'transparent'} />
+                        ))}
+                    </View>
+                </View>
+                <Text style={styles.cardCategory}>Act: {item.act_name}</Text>
+                <Text style={styles.cardDate}>{item.comment}</Text>
+            </View>
+        </View>
     );
 
     const renderMessageItem = ({ item, isBooking }: { item: any, isBooking: boolean }) => {
@@ -1091,7 +1103,7 @@ export default function AdminDashboard() {
                         contentContainerStyle={styles.listContent}
                     >
                         <Text style={styles.sectionHeader}>SUPPORT INBOX</Text>
-                        {supportRequests.length === 0 ? (
+                        {(!supportRequests || supportRequests.length === 0) ? (
                             <Text style={styles.emptyTextInline}>No support requests yet.</Text>
                         ) : (
                             supportRequests.map(item => (
@@ -1135,7 +1147,7 @@ export default function AdminDashboard() {
                         )}
 
                         <Text style={[styles.sectionHeader, { marginTop: 24 }]}>BOOKING CHATS</Text>
-                        {bookingChats.length === 0 ? (
+                        {(!bookingChats || bookingChats.length === 0) ? (
                             <Text style={styles.emptyTextInline}>No booking messages.</Text>
                         ) : (
                             bookingChats.map(item => renderMessageItem({ item, isBooking: true }))
