@@ -17,15 +17,7 @@ const CATEGORY_MAP: Record<string, string> = {
     'Drags': '6a48f266-d4a5-4e8b-babe-e58fb204645d',
 };
 
-export const config = {
-  runtime: 'edge', // Edge is faster, but standard node is also fine.
-};
-
-export default async function handler(req: Request) {
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
-
+export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
 
@@ -61,7 +53,7 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
     const geminiData = await geminiRes.json();
     let textResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
     
-    // Clean up any potential markdown formatting (e.g. ```json \n [... ] \n ```)
+    // Clean up any potential markdown formatting
     textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
 
     let matchedCategories: string[] = [];
@@ -81,7 +73,6 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // If no categories matched, we could just return nothing or a generic response
     if (!matchedCategories || matchedCategories.length === 0) {
         return new Response(JSON.stringify({ results: [], categories: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
@@ -89,7 +80,7 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
     // Map categories to UUIDs
     const categoryIds = matchedCategories
         .map(cat => CATEGORY_MAP[cat])
-        .filter(Boolean); // remove undefined
+        .filter(Boolean);
 
     if (categoryIds.length === 0) {
         return new Response(JSON.stringify({ results: [], categories: matchedCategories }), { status: 200, headers: { 'Content-Type': 'application/json' } });
