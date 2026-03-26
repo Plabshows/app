@@ -163,11 +163,8 @@ function SupportChat() {
             // Trigger AI Chat Assistant for immediate response
             try {
                 setIsTyping(true);
-                // Use a safer URL resolution for local/web
-                const apiPath = '/api/chat-assistant';
-                const apiHost = Platform.OS === 'web' ? '' : 'https://app-2i1d.vercel.app';
-                
-                fetch(`${apiHost}${apiPath}`, {
+                // Unified relative path and error handling to match Search implementation
+                fetch('/api/chat-assistant', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

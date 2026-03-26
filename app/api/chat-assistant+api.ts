@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
+  console.log("Chat Assistant API v2.1 Initialized");
   try {
     const { prompt, userId } = await req.json();
 
