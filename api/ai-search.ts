@@ -17,8 +17,9 @@ const CATEGORY_MAP: Record<string, string> = {
     'Drags': '6a48f266-d4a5-4e8b-babe-e58fb204645d',
 };
 
+// Standard Node.js runtime for better compatibility with Supabase-js
 export const config = {
-  runtime: 'edge', // Edge is faster, but standard node is also fine.
+  runtime: 'nodejs', 
 };
 
 export default async function handler(req: Request) {
@@ -36,11 +37,11 @@ export default async function handler(req: Request) {
     // Call Gemini API
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
-       console.error("GEMINI_API_KEY is missing");
        return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 500 });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    console.log("Calling Gemini at:", geminiUrl.split('?')[0]);
     
     // Exact instructions to force JSON array output
     const systemPrompt = `You are an AI matchmaker for an event entertainment platform called Performrs. 
@@ -66,9 +67,11 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
 
     let matchedCategories: string[] = [];
     try {
-        matchedCategories = JSON.parse(textResult);
+        const jsonMatch = textResult.match(/\[.*\]/s);
+        const jsonToParse = jsonMatch ? jsonMatch[0] : textResult;
+        matchedCategories = JSON.parse(jsonToParse);
     } catch (e) {
-        console.error("Failed to parse Gemini response as JSON:", textResult);
+        return new Response(JSON.stringify({ error: 'Parse failed' }), { status: 500 });
     }
 
     // Connect to Supabase
@@ -76,14 +79,16 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
     const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseKey) {
+        console.error("Missing Supabase credentials in Vercel. URL:", !!supabaseUrl, "Key:", !!supabaseKey);
         throw new Error("Missing Supabase credentials");
     }
 
+    console.log("Supabase Client initialized for URL:", supabaseUrl);
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // If no categories matched, we could just return nothing or a generic response
     if (!matchedCategories || matchedCategories.length === 0) {
-        return new Response(JSON.stringify({ results: [], categories: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ results: [], categories: [], v: 'ROOT_API_V1' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     // Map categories to UUIDs
@@ -105,14 +110,17 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
         .limit(20);
 
     if (categoryIds.length > 0) {
-        const catOrString = matchedCategories.map(c => `category.eq.${c}`).join(',');
-        query = query.or(`category_id.in.(${categoryIds.join(',')}),${catOrString}`);
+        // Only use category_id since 'category' column doesn't exist
+        query = query.in('category_id', categoryIds);
     } else if (matchedCategories.length > 0) {
-        const searchOr = matchedCategories.map(c => `category.ilike.%${c}%,description.ilike.%${c}%`).join(',');
+        // Fallback: search for category names in the bio/name if no ID match
+        const searchOr = matchedCategories.map(c => `name.ilike.%${c}%,bio.ilike.%${c}%`).join(',');
         query = query.or(searchOr);
     }
 
+    console.log("Matched Category IDs:", categoryIds);
     const { data: profiles, error } = await query;
+    console.log("Supabase Profiles Found:", profiles?.length || 0);
 
     if (error) {
         console.error("Supabase Error:", error);
@@ -133,7 +141,6 @@ Respond ONLY with a valid JSON array of strings containing the matched categorie
     });
 
   } catch (error: any) {
-    console.error("AI Search Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
