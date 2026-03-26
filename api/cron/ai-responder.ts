@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../../src/lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // IMPORTANT: Edge functions might need different supabase init if lib assumes browser, 
@@ -25,11 +25,11 @@ export default async function handler(req: any, res: any) {
 
     console.log("AI Concierge Job Started...");
 
-    // 2. Fetch Unread Messages older than 15 minutes written by a client
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    // 2. Fetch Unread Messages older than 1 minute written by a client
+    const oneMinAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
     
     // We join messages with profiles to check if sender_role is client, or simply check if sender is not admin
-    // Or simpler: fetch all unread messages older than 15m.
+    // Or simpler: fetch all unread messages older than 1m.
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
       .select(`
@@ -37,7 +37,7 @@ export default async function handler(req: any, res: any) {
         profiles!sender_id(id, role, name)
       `)
       .eq('status', 'unread')
-      .lt('created_at', fifteenMinsAgo)
+      .lt('created_at', oneMinAgo)
       // Usually type 'chat' or 'text' implies a normal text message
       .in('type', ['text', 'chat']);
 

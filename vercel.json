@@ -11,7 +11,7 @@
     "crons": [
         {
             "path": "/api/cron/ai-responder",
-            "schedule": "*/15 * * * *"
+            "schedule": "* * * * *"
         }
     ]
 }
