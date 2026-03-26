@@ -158,6 +158,22 @@ function SupportChat() {
                 status: 'unread',
             });
             if (error) throw error;
+
+            // Trigger AI Chat Assistant for immediate response
+            try {
+                const apiHost = Platform.OS === 'web' ? '' : 'https://app-2i1d.vercel.app';
+                fetch(`${apiHost}/api/chat-assistant`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: content,
+                        userId: user.id
+                    })
+                }).catch(err => console.error("AI trigger failed:", err));
+            } catch (aiErr) {
+                console.warn("AI Assistant trigger error:", aiErr);
+            }
+
         } catch (e: any) {
             setMessages(prev => prev.filter(m => m.id !== optimisticId));
             Alert.alert('Error', e.message || 'Failed to send message');
