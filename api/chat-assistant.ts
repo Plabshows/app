@@ -36,7 +36,7 @@ export default async function handler(req: Request) {
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!GEMINI_API_KEY || !supabaseUrl || !supabaseKey) {
       return new Response(JSON.stringify({ error: 'Server context missing' }), { status: 500 });
