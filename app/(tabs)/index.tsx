@@ -89,10 +89,13 @@ export default function DiscoverScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, activeCategory]);
 
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const handleAISearch = async () => {
     if (!searchQuery.trim()) return;
     setIsAILoading(true);
     setAiResults(null);
+    setAiError(null);
     setAiCategories([]);
     try {
       const response = await fetch('/api/ai-search', {
@@ -109,9 +112,9 @@ export default function DiscoverScreen() {
       setAiResults(data.results || []);
       setAiCategories(data.categories || []);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Search Error:", error);
-      alert("Error en la búsqueda con IA. Prueba de nuevo.");
+      setAiError(error.message || "No pudimos completar la búsqueda con IA. Prueba con otros términos.");
     } finally {
       setIsAILoading(false);
     }
@@ -196,7 +199,7 @@ export default function DiscoverScreen() {
           <Text style={styles.agencyHeroSubtitle}>
             Full-service event entertainment. We curate, manage, and deliver unforgettable experiences.
           </Text>
-          <Pressable style={styles.agencyHeroCTA} onPress={() => router.push('/(tabs)/search')}>
+          <Pressable style={styles.agencyHeroCTA} onPress={() => router.push('/client-dashboard/my-event' as any)}>
             <Text style={styles.agencyHeroCTAText}>PLAN YOUR EVENT</Text>
           </Pressable>
         </View>
@@ -245,7 +248,7 @@ export default function DiscoverScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.m, gap: SPACING.m }}>
           {SOLUTIONS.map(sol => (
-            <Pressable key={sol.id} style={styles.solutionCard} onPress={() => router.push('/(tabs)/search')}>
+            <Pressable key={sol.id} style={styles.solutionCard} onPress={() => router.push('/client-dashboard/my-event' as any)}>
               <Image source={sol.image} style={styles.solutionImage} />
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={StyleSheet.absoluteFill} />
               <View style={styles.solutionContent}>
@@ -448,6 +451,18 @@ export default function DiscoverScreen() {
       );
     }
 
+    if (aiError) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ghost size={48} color="#FF3B30" />
+          <Text style={[styles.emptyText, { color: '#FF3B30' }]}>{aiError}</Text>
+          <Pressable onPress={() => { setAiError(null); handleAISearch(); }}>
+            <Text style={styles.clearText}>Reintentar búsqueda</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     if (!aiResults) return null;
 
     return (
@@ -497,6 +512,9 @@ export default function DiscoverScreen() {
                         ? item.categories.join(' • ') 
                         : item.category}
                     </Text>
+                    {item.match_reason && (
+                      <Text style={styles.matchReason} numberOfLines={2}>{item.match_reason}</Text>
+                    )}
                     <Text style={styles.featuredLocation}>{item.location_base || 'International'}</Text>
                   </View>
                 </Pressable>
@@ -742,6 +760,14 @@ const styles = StyleSheet.create({
   featuredLocation: {
     color: COLORS.textDim,
     fontSize: 12,
+  },
+  matchReason: {
+    color: '#E2E2E2',
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 2,
+    marginBottom: 4,
+    lineHeight: 14,
   },
   categoryCard: {
     alignItems: 'center',

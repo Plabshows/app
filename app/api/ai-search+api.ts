@@ -1,20 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Define the UUID mapping identical to the frontend
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const CATEGORY_MAP: Record<string, string> = {
-    'Musicians': '636d2dcd-3e1d-4b1e-b111-a6400ca1b025',
-    'Dancers': 'bf451e54-4edb-4453-8ff7-f74a3882e89c',
-    'Magic': 'f26b86db-2ef5-476b-bf53-3a09d4ecba17',
-    'Roaming': '42f050db-aa72-4a8f-97ba-8521b4c1ec03',
-    'Fire & Flow': '95585a4e-1cc1-417e-a064-7f210b9c2996',
-    'Circus': '6e2eba1a-54ee-4360-95b1-932089633089',
-    'DJ': 'bff4df18-b95f-4f7e-821b-ab303b030c9a',
-    'Specialty Acts': '7dc05cb1-fa8a-4317-9c17-d2682831d73c',
-    'Singer': '0ca60f4f-2c8b-421c-9711-88f1e9327cb8',
-    'Art': '8a662c88-7702-4ec7-bd70-671d707a0774',
-    'Water Acts': '347f8d09-522b-44a7-8453-3950f907ce9f',
-    'Actors': '95a06893-94ff-4500-9fbf-b32efce7026f',
-    'Drags': '6a48f266-d4a5-4e8b-babe-e58fb204645d',
+    '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',
+    'bf451e54-4edb-4453-8ff7-f74a3882e89c': 'Dancers',
+    'f26b86db-2ef5-476b-bf53-3a09d4ecba17': 'Magic',
+    '42f050db-aa72-4a8f-97ba-8521b4c1ec03': 'Roaming',
+    '95585a4e-1cc1-417e-a064-7f210b9c2996': 'Fire & Flow',
+    '6e2eba1a-54ee-4360-95b1-932089633089': 'Circus',
+    'bff4df18-b95f-4f7e-821b-ab303b030c9a': 'DJ',
+    '7dc05cb1-fa8a-4317-9c17-d2682831d73c': 'Specialty Acts',
+    '0ca60f4f-2c8b-421c-9711-88f1e9327cb8': 'Singer',
+    '8a662c88-7702-4ec7-bd70-671d707a0774': 'Art',
+    '95a06893-94ff-4500-9fbf-b32efce7026f': 'Actors',
+    '6a48f266-d4a5-4e8b-babe-e58fb204645d': 'Drags',
+    '347f8d09-522b-44a7-8453-3950f907ce9f': 'Water Acts',
 };
 
 export async function POST(req: Request) {
@@ -22,109 +25,120 @@ export async function POST(req: Request) {
     const { prompt } = await req.json();
 
     if (!prompt) {
-      return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Falta el requerimiento del cliente' }), { status: 400 });
     }
 
-    // Call Gemini API
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    // 1. Fetch ALL published artists to give Gemini context
+    const { data: allArtists, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, name, description, category_id, categories')
+        .eq('is_published', true)
+        .or('role.eq.artist,role.eq.talent');
+
+    if (fetchError) {
+        console.error("Supabase Fetch Error:", fetchError);
+        return new Response(JSON.stringify({ error: `Error DB: ${fetchError.message}` }), { status: 500 });
+    }
+
+    // 2. Prepare context for Gemini
+    const artistContext = (allArtists || []).map(a => 
+        `ID: ${a.id} | Name: ${a.name} | Description: ${a.description} | Categories: ${(a.categories || []).join(', ')}`
+    ).join('\n');
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
-       console.error("GEMINI_API_KEY is missing");
-       return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 500 });
+       console.error("AI Search Error: GEMINI_API_KEY is missing");
+       return new Response(JSON.stringify({ error: 'Configuración de Servidor: Falta GEMINI_API_KEY' }), { status: 500 });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    // Using v1 endpoint which seems more stable for these models
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
-    // Exact instructions to force JSON array output
-    const systemPrompt = `You are an AI matchmaker for an event entertainment platform called Performrs. 
-Based on the user's event description, identify the best matching artist categories from this EXACT list:
-["Musicians", "Dancers", "Magic", "Roaming", "Fire & Flow", "Circus", "DJ", "Specialty Acts", "Singer", "Art", "Water Acts", "Actors", "Drags"]
-Respond ONLY with a valid JSON array of strings containing the matched categories. Do not include any markdown formatting, backticks, or other text.`;
+    const systemPrompt = `You are the Expert Matchmaker for 'Performrs'.
+Your job is to read a user's event requirement and find the most suitable artists from our catalog.
 
-    const geminiBody = {
-      contents: [{ parts: [{ text: `${systemPrompt}\n\nUser request: ${prompt}` }] }]
-    };
+CATALOG OF ARTISTS:
+${artistContext}
+
+USER REQUIREMENT:
+"${prompt}"
+
+GOAL:
+1. Understand the vibe, theme, and type of entertainment requested.
+2. Match the user's request with up to 10 artists from the catalog.
+3. Provide a tailored 'Match Reason' for each artist in Spanish.
+
+RESPONSE FORMAT (Strict JSON):
+Return ONLY a valid JSON array of objects: [{"id": "UUID", "reason": "Reason in Spanish"}].
+If no matches exist, return [].`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody)
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemPrompt }] }]
+      })
     });
+
+    if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        console.error("Gemini API Error:", geminiRes.status, errText);
+        return new Response(JSON.stringify({ 
+            error: `API IA Error (${geminiRes.status}): ${errText.slice(0, 150)}...`,
+            debug: { artistCount: allArtists?.length || 0 }
+        }), { status: 500 });
+    }
 
     const geminiData = await geminiRes.json();
     let textResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
     
-    // Clean up any potential markdown formatting
+    // Clean markdown
     textResult = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    let matchedCategories: string[] = [];
+    let matches: { id: string, reason: string }[] = [];
     try {
-        matchedCategories = JSON.parse(textResult);
+        const jsonMatch = textResult.match(/\[.*\]/s);
+        matches = JSON.parse(jsonMatch ? jsonMatch[0] : textResult);
     } catch (e) {
-        console.error("Failed to parse Gemini response as JSON:", textResult);
+        console.error("AI Parse Error:", textResult);
+        return new Response(JSON.stringify({ error: 'Error al procesar la respuesta de la IA' }), { status: 500 });
     }
 
-    // Connect to Supabase
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error("Missing Supabase credentials");
+    if (!Array.isArray(matches) || matches.length === 0) {
+        return new Response(JSON.stringify({ results: [], categories: [] }), { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    if (!matchedCategories || matchedCategories.length === 0) {
-        return new Response(JSON.stringify({ results: [], categories: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // Map categories to UUIDs
-    const categoryIds = matchedCategories
-        .map(cat => CATEGORY_MAP[cat])
-        .filter(Boolean);
-
-    if (categoryIds.length === 0) {
-        return new Response(JSON.stringify({ results: [], categories: matchedCategories }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // Query published profiles
-    let query = supabase
+    const matchedIds = matches.map(m => m.id);
+    const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('is_published', true)
-        .or('role.eq.artist,role.eq.talent')
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .in('id', matchedIds);
 
-    if (categoryIds.length > 0) {
-        const catOrString = matchedCategories.map(c => `category.eq.${c}`).join(',');
-        query = query.or(`category_id.in.(${categoryIds.join(',')}),${catOrString}`);
-    } else if (matchedCategories.length > 0) {
-        const searchOr = matchedCategories.map(c => `category.ilike.%${c}%,description.ilike.%${c}%`).join(',');
-        query = query.or(searchOr);
-    }
+    if (profileError) throw profileError;
 
-    const { data: profiles, error } = await query;
+    const results = (profiles || []).map(p => {
+        const matchInfo = matches.find(m => m.id === p.id);
+        return {
+            ...p,
+            match_reason: matchInfo?.reason || 'Recomendado por nuestra IA',
+            category: CATEGORY_MAP[p.category_id] || (p.categories?.[0]) || 'Artist',
+            image_url: p.avatar_url || p.banner_url || (Array.isArray(p.gallery_urls) ? p.gallery_urls[0] : null) || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
+            location_base: p.city || 'Ibiza',
+        };
+    });
 
-    if (error) {
-        console.error("Supabase Error:", error);
-        throw error;
-    }
+    const sortedResults = matchedIds.map(id => results.find(r => r.id === id)).filter(Boolean);
 
-    // Map the results immediately so the frontend has them formatted
-    const mappedProfiles = (profiles || []).map((item: any) => ({
-        ...item,
-        category: CATEGORY_MAP[item.category_id] || item.category || 'Artist',
-        image_url: item.avatar_url || item.banner_url || (Array.isArray(item.gallery_urls) ? item.gallery_urls[0] : null) || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png',
-        location_base: item.city || 'International',
-    }));
-
-    return new Response(JSON.stringify({ results: mappedProfiles, categories: matchedCategories }), { 
+    return new Response(JSON.stringify({ results: sortedResults, categories: [] }), { 
         status: 200, 
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });
 
   } catch (error: any) {
-    console.error("AI Search Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    console.error("AI Search Global Error:", error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

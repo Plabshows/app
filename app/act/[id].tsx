@@ -599,19 +599,30 @@ export default function ActDetail() {
     const mainYtId = useMemo(() => getYouTubeID(editedData?.video_url || displayAct.video_url || ''), [isEditing, editedData?.video_url, displayAct.video_url]);
 
     // Helper: skip generic Unsplash placeholder URLs
-    const isRealPhoto = (url?: string | null) => url && !url.includes('images.unsplash.com');
+    const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+    const handleImageError = (key: string) => {
+        setImageErrors(prev => ({ ...prev, [key]: true }));
+    };
+
+    // Helper: keep all valid URLs, fallback handled by state + onError
+    const isRealPhoto = (url?: string | null, key?: string) => {
+        if (!url) return false;
+        if (key && imageErrors[key]) return false;
+        return true;
+    };
 
     // Standardized Image Hierarchy: Banner (Portada) > Avatar (Perfil) > Photos[0] (Galería)
-    const coverImageUrl = (isRealPhoto(displayAct.banner_url) ? displayAct.banner_url : null)
-        || (isRealPhoto(displayAct.avatar_url) ? displayAct.avatar_url : null)
-        || (Array.isArray(photos) && isRealPhoto(photos[0]) ? photos[0] : null)
-        || (displayAct.image_url && isRealPhoto(displayAct.image_url) ? displayAct.image_url : null)
+    const coverImageUrl = (isRealPhoto(displayAct.banner_url, 'banner') ? displayAct.banner_url : null)
+        || (isRealPhoto(displayAct.avatar_url, 'avatar') ? displayAct.avatar_url : null)
+        || (Array.isArray(photos) && isRealPhoto(photos[0], 'gallery0') ? photos[0] : null)
+        || (displayAct.image_url && isRealPhoto(displayAct.image_url, 'legacy') ? displayAct.image_url : null)
         || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-banner.png'; // Brand-consistent fallback
 
-    const avatarUrl = (isRealPhoto(displayAct.avatar_url) ? displayAct.avatar_url : null)
-        || (isRealPhoto(displayAct.banner_url) ? displayAct.banner_url : null)
-        || (Array.isArray(photos) && isRealPhoto(photos[0]) ? photos[0] : null)
-        || (displayAct.image_url && isRealPhoto(displayAct.image_url) ? displayAct.image_url : null)
+    const avatarUrl = (isRealPhoto(displayAct.avatar_url, 'avatar') ? displayAct.avatar_url : null)
+        || (isRealPhoto(displayAct.banner_url, 'banner') ? displayAct.banner_url : null)
+        || (Array.isArray(photos) && isRealPhoto(photos[0], 'gallery0') ? photos[0] : null)
+        || (displayAct.image_url && isRealPhoto(displayAct.image_url, 'legacy') ? displayAct.image_url : null)
         || 'https://euphonious-kelpie-cd0a27.netlify.app/images/default-avatar.png'; // Brand-consistent fallback
 
     // Rating logic
@@ -670,6 +681,7 @@ export default function ActDetail() {
                     <Image
                         source={{ uri: isEditing ? editedData?.banner_url : coverImageUrl }}
                         style={styles.coverImage}
+                        onError={() => handleImageError('banner')}
                     />
                 )}
                 <View style={[styles.coverOverlay, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
@@ -692,15 +704,17 @@ export default function ActDetail() {
                     </View>
                 )}
 
-                {/* Back Button */}
-                <Pressable
-                    style={styles.backButtonAbsolute}
-                    onPress={handleGoBack}
-                >
-                    <ArrowLeft color="#fff" size={24} />
-                </Pressable>
+                {/* Top Controls Overlay */}
+                <View style={[styles.topBar, { top: insets.top + 10 }]}>
+                    {/* Back Button */}
+                    <Pressable
+                        style={styles.roundIconBtn}
+                        onPress={handleGoBack}
+                    >
+                        <ArrowLeft color="#fff" size={24} />
+                    </Pressable>
 
-                {/* Favorite Button */}
+                    {/* Action Buttons */}
                     <View style={{ flexDirection: 'row', gap: 10 }}>
                         {!isEditing && profile?.role === 'client' && (
                             <Pressable
@@ -723,6 +737,7 @@ export default function ActDetail() {
                             </Pressable>
                         )}
                     </View>
+                </View>
 
                 {/* Performance Lab Management Badge */}
                 <View style={styles.agencyBadgeAbsolute}>
@@ -1594,7 +1609,7 @@ const styles = StyleSheet.create({
     },
     topBar: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 60 : 40,
+        top: Platform.OS === 'ios' ? 55 : 35,
         left: 20,
         right: 20,
         flexDirection: 'row',

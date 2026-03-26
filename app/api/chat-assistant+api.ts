@@ -1,82 +1,110 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Expo Server API Handler
 export async function POST(req: Request) {
   try {
     const { prompt, userId } = await req.json();
 
     if (!prompt) {
-      return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Falta el mensaje del usuario' }), { status: 400 });
     }
 
-    // Use local env vars or defaults
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!GEMINI_API_KEY || !supabaseUrl || !supabaseKey) {
-        return new Response(JSON.stringify({ error: 'Server context missing' }), { status: 500 });
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+ 
+    if (!GEMINI_API_KEY) {
+        return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });
     }
-
+ 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 1. Fetch Dynamic Context: All published artists
+ 
+    // 1. Fetch Context
     const { data: artists, error: artistError } = await supabase
       .from('profiles')
       .select('name, description, role')
       .eq('is_published', true)
       .or('role.eq.artist,role.eq.talent');
-
-    if (artistError) throw artistError;
-
+ 
+    if (artistError) {
+        return new Response(JSON.stringify({ error: `Error DB Artistas: ${artistError.message}` }), { status: 500 });
+    }
+ 
     const artistContext = (artists || []).map(a => `- ${a.name}: ${a.description}`).join('\n');
+ 
+    const systemInstruction = `Eres la Inteligencia Artificial de Soporte Concierge VIP de Performance Lab.
+Tu misión es proporcionar una experiencia de lujo, rápida y eficiente a nuestros clientes y artistas.
 
-    // 2. Prepare Gemini Prompt
-    const systemInstruction = `Eres el Asistente Virtual oficial de la aplicación Performance Lab.
-Tu misión principal es asistir a los usuarios respondiendo dudas, dando ideas sobre los artistas disponibles en la plataforma y dando indicaciones claras sobre cómo usar la app para hacer reservas (bookings) o cualquier otra funcionalidad.
-
-LISTA DE ARTISTAS DISPONIBLES:
+SOPORTE CONCIERGE:
+- Tono EXTREMADAMENTE PROFESIONAL y refinado (VIP).
+- LISTA DE ARTISTAS DISPONIBLES:
 ${artistContext}
 
-REGLAS CRÍTICAS:
-1. Usa solo la información de la lista de artistas proporcionada para dar recomendaciones.
-2. REGLA DE SEGURIDAD ESTRICTA: Si el usuario te hace una pregunta cuya respuesta no conoces, no estás seguro o se trata de una negociación compleja, PROHIBIDO INVENTAR INFORMACIÓN. En su lugar, debes responder amablemente diciendo que no tienes la respuesta exacta y que vas a enviar esa consulta directamente al Administrador para que se ponga en contacto con ellos lo antes posible.
-3. Responde siempre de forma VIP, profesional y amable en español.
-...
+INSTRUCCIONES:
+1. RECOMENDACIONES: Usa la lista anterior.
+2. SOPORTE: Responde dudas técnicas o comerciales.
+3. IDIOMA: Responde en el mismo idioma que el usuario.
 `;
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+ 
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
     const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${systemInstruction}\n\nPregunta del usuario: ${prompt}` }] }]
-      })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemInstruction}\n\nUsuario: ${prompt}` }] }]
+        })
     });
 
+    if (!geminiRes.ok) {
+        const errBody = await geminiRes.text();
+        console.error("Gemini Chat API Error:", geminiRes.status, errBody);
+        return new Response(JSON.stringify({ 
+            error: 'Lo siento, no puedo procesar tu solicitud en este momento por un problema técnico. Inténtalo de nuevo pronto.' 
+        }), { status: 500 });
+    }
+
     const geminiData = await geminiRes.json();
-    const botResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no puedo procesar tu solicitud en este momento.";
+    const botResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no pude generar una respuesta. ¿Puedes intentarlo de nuevo?";
 
     // 3. Persistence
+    let insertedMessage = null;
     if (userId) {
-        await supabase
-          .from('messages')
-          .insert({
+        const { data: msg, error: insError } = await supabase
+            .from('messages')
+            .insert({
+                content: botResponse,
+                sender_id: '00000000-0000-0000-0000-000000000000',
+                receiver_id: userId,
+                status: 'unread',
+                type: 'text',
+                metadata: { source: 'AI_ASSISTANT_LOCAL' }
+            })
+            .select()
+            .single();
+        
+        if (insError) {
+            console.warn("Error insertando mensaje AI:", insError);
+        }
+        insertedMessage = msg;
+    }
+
+    return new Response(JSON.stringify({ 
+        response: botResponse, 
+        message: insertedMessage || {
+            id: 'temp-' + Date.now(),
             content: botResponse,
             sender_id: '00000000-0000-0000-0000-000000000000',
             receiver_id: userId,
-            status: 'unread',
-            type: 'text',
-            metadata: { source: 'AI_ASSISTANT_LOCAL' }
-          });
-    }
-
-    return new Response(JSON.stringify({ response: botResponse }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
+            created_at: new Date().toISOString(),
+            status: 'unread'
+        }
+    }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error: any) {
+    console.error("Chat Assistant Global Error:", error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

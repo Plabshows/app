@@ -57,6 +57,7 @@ function SupportChat() {
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -161,17 +162,60 @@ function SupportChat() {
 
             // Trigger AI Chat Assistant for immediate response
             try {
+                setIsTyping(true);
+                // Use a safer URL resolution for local/web
+                const apiPath = '/api/chat-assistant';
                 const apiHost = Platform.OS === 'web' ? '' : 'https://app-2i1d.vercel.app';
-                fetch(`${apiHost}/api/chat-assistant`, {
+                
+                fetch(`${apiHost}${apiPath}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: content,
                         userId: user.id
                     })
-                }).catch(err => console.error("AI trigger failed:", err));
+                })
+                .then(async (res) => {
+                    const data = await res.json();
+                    if (res.ok) {
+                        if (data.message) {
+                            setMessages(prev => {
+                                if (prev.some(m => m.id === data.message.id)) return prev;
+                                return [...prev, data.message];
+                            });
+                        }
+                    } else {
+                        console.warn("AI response not OK:", res.status, data.error);
+                        // Add an error message from the Concierge
+                        const errorMsg: Message = {
+                            id: 'err-' + Date.now(),
+                            sender_id: '00000000-0000-0000-0000-000000000000',
+                            receiver_id: user.id,
+                            content: `[SOPORTE CONCIERGE]: Disculpa las molestias, estamos experimentando una breve interrupción técnica. Por favor, intenta enviarme tu consulta de nuevo en unos instantes.`,
+                            status: 'unread',
+                            created_at: new Date().toISOString()
+                        };
+                        setMessages(prev => [...prev, errorMsg]);
+                    }
+                })
+                .catch(err => {
+                    console.error("AI trigger failed:", err);
+                    const errorMsg: Message = {
+                        id: 'err-net-' + Date.now(),
+                        sender_id: '00000000-0000-0000-0000-000000000000',
+                        receiver_id: user.id,
+                        content: `[SOPORTE]: Error de conexión al procesar con IA. Por favor verifica tu red.`,
+                        status: 'unread',
+                        created_at: new Date().toISOString()
+                    };
+                    setMessages(prev => [...prev, errorMsg]);
+                })
+                .finally(() => {
+                    setIsTyping(false);
+                });
             } catch (aiErr) {
                 console.warn("AI Assistant trigger error:", aiErr);
+                setIsTyping(false);
             }
 
         } catch (e: any) {
@@ -378,6 +422,12 @@ function SupportChat() {
                         <Text style={styles.emptySubtitle}>Send us a message and we'll get back to you shortly.</Text>
                     </View>
                 )}
+                ListFooterComponent={() => isTyping ? (
+                    <View style={styles.typingContainer}>
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                        <Text style={styles.typingText}>Concierge is typing...</Text>
+                    </View>
+                ) : <View style={{ height: 20 }} />}
             />
 
             <View style={[
@@ -589,6 +639,18 @@ const styles = StyleSheet.create({
     bookingStats: {
         gap: 8,
         marginBottom: 16,
+    },
+    typingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        gap: 8,
+    },
+    typingText: {
+        color: '#666',
+        fontSize: 12,
+        fontStyle: 'italic',
     },
     statItem: {
         flexDirection: 'row',
