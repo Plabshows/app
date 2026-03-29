@@ -90,6 +90,7 @@ export default function DiscoverScreen() {
   }, [searchQuery, activeCategory]);
 
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiDebug, setAiDebug] = useState<{ artistCount: number } | null>(null);
 
   const handleAISearch = async () => {
     if (!searchQuery.trim()) return;
@@ -97,6 +98,7 @@ export default function DiscoverScreen() {
     setAiResults(null);
     setAiError(null);
     setAiCategories([]);
+    setAiDebug(null);
     try {
       const response = await fetch('/api/ai-search', {
         method: 'POST',
@@ -111,6 +113,7 @@ export default function DiscoverScreen() {
 
       setAiResults(data.results || []);
       setAiCategories(data.categories || []);
+      if (data.debug) setAiDebug(data.debug);
       
     } catch (error: any) {
       console.error("AI Search Error:", error);
@@ -480,7 +483,12 @@ export default function DiscoverScreen() {
           <View style={styles.emptyContainer}>
             <Ghost size={48} color={COLORS.textDim} />
             <Text style={styles.emptyText}>No artists matched your request perfectly.</Text>
-            <Pressable onPress={() => { setAiResults(null); }}>
+            {aiDebug && (
+              <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>
+                (IA evaluó {aiDebug.artistCount} artistas)
+              </Text>
+            )}
+            <Pressable onPress={() => { setAiResults(null); }} style={{ marginTop: 16 }}>
               <Text style={styles.clearText}>Clear AI Search</Text>
             </Pressable>
           </View>
