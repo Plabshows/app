@@ -105,7 +105,11 @@ If no matches exist, return [].`;
     }
 
     if (!Array.isArray(matches) || matches.length === 0) {
-        return new Response(JSON.stringify({ results: [], categories: [] }), { 
+        return new Response(JSON.stringify({ 
+            results: [], 
+            categories: [],
+            debug: { artistCount: allArtists?.length || 0 }
+        }), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 
         });
@@ -132,7 +136,11 @@ If no matches exist, return [].`;
 
     const sortedResults = matchedIds.map(id => results.find(r => r.id === id)).filter(Boolean);
 
-    return new Response(JSON.stringify({ results: sortedResults, categories: [] }), { 
+    return new Response(JSON.stringify({ 
+        results: sortedResults, 
+        categories: [],
+        debug: { artistCount: allArtists?.length || 0 }
+    }), { 
         status: 200, 
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });
