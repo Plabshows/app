@@ -10,8 +10,10 @@ export async function POST(req: Request) {
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+    // Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local Expo dev)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
+    // Use SERVICE_ROLE_KEY to bypass RLS on backend
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
  
     if (!GEMINI_API_KEY) {
         return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });

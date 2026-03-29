@@ -4,9 +4,10 @@ export const config = {
   runtime: 'edge',
 };
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-// Use service role key if available for backend operations to bypass RLS, fallback to anon key
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+// Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local dev)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
+// Always use SERVICE_ROLE_KEY on backend to bypass RLS and see all published artists
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CATEGORY_MAP: Record<string, string> = {
