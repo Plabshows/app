@@ -164,54 +164,48 @@ function SupportChat() {
             try {
                 setIsTyping(true);
                 // Unified relative path and error handling to match Search implementation
-                fetch('/api/chat-assistant', {
+                const res = await fetch('/api/chat-assistant', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: content,
                         userId: user.id
                     })
-                })
-                .then(async (res) => {
-                    const data = await res.json();
-                    if (res.ok) {
-                        if (data.message) {
-                            setMessages(prev => {
-                                if (prev.some(m => m.id === data.message.id)) return prev;
-                                return [...prev, data.message];
-                            });
-                        }
-                    } else {
-                        console.warn("AI response not OK:", res.status, data.error);
-                        // Add an error message from the Concierge
-                        const errorMsg: Message = {
-                            id: 'err-' + Date.now(),
-                            sender_id: '00000000-0000-0000-0000-000000000000',
-                            receiver_id: user.id,
-                            content: `[SOPORTE CONCIERGE]: Disculpa las molestias, estamos experimentando una breve interrupción técnica. Por favor, intenta enviarme tu consulta de nuevo en unos instantes.`,
-                            status: 'unread',
-                            created_at: new Date().toISOString()
-                        };
-                        setMessages(prev => [...prev, errorMsg]);
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    if (data.message) {
+                        setMessages(prev => {
+                            if (prev.some(m => m.id === data.message.id)) return prev;
+                            return [...prev, data.message];
+                        });
                     }
-                })
-                .catch(err => {
-                    console.error("AI trigger failed:", err);
+                } else {
+                    console.error("AI response not OK:", res.status, data.error);
+                    // Add an error message from the Concierge
                     const errorMsg: Message = {
-                        id: 'err-net-' + Date.now(),
+                        id: 'err-' + Date.now(),
                         sender_id: '00000000-0000-0000-0000-000000000000',
                         receiver_id: user.id,
-                        content: `[SOPORTE]: Error de conexión al procesar con IA. Por favor verifica tu red.`,
+                        content: `[SOPORTE CONCIERGE]: Disculpa las molestias, estamos experimentando una breve interrupción técnica. Por favor, intenta enviarme tu consulta de nuevo en unos instantes.`,
                         status: 'unread',
                         created_at: new Date().toISOString()
                     };
                     setMessages(prev => [...prev, errorMsg]);
-                })
-                .finally(() => {
-                    setIsTyping(false);
-                });
+                }
             } catch (aiErr) {
-                console.warn("AI Assistant trigger error:", aiErr);
+                console.error("AI Assistant trigger error:", aiErr);
+                const errorMsg: Message = {
+                    id: 'err-net-' + Date.now(),
+                    sender_id: '00000000-0000-0000-0000-000000000000',
+                    receiver_id: user.id,
+                    content: `[SOPORTE]: Error de conexión al procesar con IA. Por favor verifica tu red.`,
+                    status: 'unread',
+                    created_at: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, errorMsg]);
+            } finally {
                 setIsTyping(false);
             }
 
