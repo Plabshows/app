@@ -4,7 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
 // Always use SERVICE_ROLE_KEY on backend to bypass RLS and see all published artists
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
 
 const CATEGORY_MAP: Record<string, string> = {
     '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',
@@ -24,9 +26,16 @@ const CATEGORY_MAP: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
+    let prompt;
+    try {
+      const body = await req.json();
+      prompt = body.prompt;
+    } catch (e) {
+      console.error("Error parseando JSON del Request:", e);
+    }
 
     if (!prompt) {
+      console.error('Petición cancelada porque falta el query/body');
       return new Response(JSON.stringify({ error: 'Falta el requerimiento del cliente' }), { status: 400 });
     }
 
