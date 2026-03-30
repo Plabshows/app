@@ -7,9 +7,17 @@ export const config = {
 export async function POST(req: Request) {
   console.log("Chat Assistant API v2.2 (Edge) Initialized");
   try {
-    const { prompt, userId } = await req.json();
+    let prompt, userId;
+    try {
+      const body = await req.json();
+      prompt = body.prompt;
+      userId = body.userId;
+    } catch (e) {
+      console.error("Error parseando JSON del Request:", e);
+    }
 
     if (!prompt) {
+      console.error('Petición cancelada porque falta el query/body');
       return new Response(JSON.stringify({ error: 'Falta el mensaje del usuario' }), { status: 400 });
     }
 
@@ -23,7 +31,9 @@ export async function POST(req: Request) {
         return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });
     }
  
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
  
     // 1. Fetch Context
     const { data: artists, error: artistError } = await supabase
