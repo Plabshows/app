@@ -107,42 +107,157 @@ Producción completa del evento
 
 ---
 
-## 🎭 SHOWS Y PERSONAJES
+## 🔥 PERFORMANCE LAB — ARTISTS & SHOWS
 
-### Mirror Family
-Elegante, premium, reflejos
+### 🪩 DANCERS
 
-### Pom Pom Monsters
-Divertido, energía, color
+**Samba Dancers**
+Un show vibrante y lleno de energía que transforma cualquier evento en una celebración. Ritmo, color y presencia escénica para crear un ambiente festivo desde el primer momento.
+*Ideal para: fiestas, beach clubs, eventos internacionales*
 
-### TV Heads
-Tecnológico, branding
+**Contemporary Dancers**
+Una propuesta elegante y expresiva que aporta un toque artístico y emocional. Movimiento fluido y estética moderna para eventos sofisticados.
+*Ideal para: bodas, eventos premium, experiencias artísticas*
 
-### Boombox Heads
-Urbano, hip hop
+**Breakdance Crew**
+Equipo de bailarines urbanos de alto nivel que ofrecen un show dinámico, técnico y lleno de energía.
+*Ideal para: eventos corporativos, marcas, fiestas urbanas*
 
-### Roller Dancers
-Dinámico, movimiento
+**B-Boy Monkeys**
+Un show único que mezcla hip-hop, acrobacia y personaje. Divertido, impactante y altamente interactivo.
+*Ideal para: eventos dinámicos, público joven, momentos sorpresa*
 
-### LED Champagne Skirts
-Elegante + servicio
+**LED Roller Girls**
+Bailarinas sobre patines con iluminación LED que combinan movimiento, música y visuales en un espectáculo envolvente.
+*Ideal para: fiestas, clubs, eventos nocturnos*
 
-### Cosmic Girls
-Futurista, fashion
+**Roller Lab**
+Equipo especializado en performers sobre patines, creando experiencias dinámicas y fluidas en el espacio.
+*Ideal para: eventos activos, activaciones de marca, fiestas*
 
-### Teddy Monster
-Impacto máximo
+**Mirror Women**
+Una combinación de danza y arte visual con vestuario reflectante que crea un impacto elegante y futurista.
+*Ideal para: eventos premium, bodas, recepciones*
 
----
+**Flamenco Dancers**
+Pasión, fuerza y tradición reinterpretadas para eventos contemporáneos.
+*Ideal para: eventos en España, bodas, experiencias culturales*
 
-## 🔥 SHOWS ESPECIALES
+**Hedge Men**
+Personajes visuales con estética única que aportan un toque surrealista y llamativo.
+*Ideal para: eventos creativos, activaciones, festivales*
 
-- Fuego
-- Acrobacia
-- VR Art
-- Música en vivo
+**Pom Pom Monsters**
+Criaturas visuales llenas de color y volumen que generan interacción y energía en el público.
+*Ideal para: fiestas, clubs, eventos experienciales*
 
-(No dar precio directo)
+**Golden Mirror Ballerinas**
+Elegancia clásica con un toque moderno. Bailarinas con estética dorada y sofisticada.
+*Ideal para: cenas de gala, bodas, eventos de lujo*
+
+**Gogo Dancers**
+Bailarines con energía continua para animación de pista y ambientes festivos.
+*Ideal para: clubs, fiestas, eventos nocturnos*
+
+**The Mime**
+Un performer expresivo que interactúa con el público sin palabras, creando momentos únicos.
+*Ideal para: eventos creativos, cócteles, experiencias inmersivas*
+
+**The Shamans**
+Performance conceptual con estética ritual y visual potente.
+*Ideal para: eventos temáticos, festivales, experiencias artísticas*
+
+### 🤖 ROAMING & VISUAL CHARACTERS
+
+**Mirror Crew / Mirror Ball Head**
+Personajes icónicos que reflejan la luz del entorno creando un efecto visual impactante y elegante.
+*Ideal para: recepciones, bodas, eventos premium*
+
+**TV Heads**
+Performers con pantallas en la cabeza que permiten integrar visuales o branding.
+*Ideal para: eventos corporativos, lanzamientos, tecnología*
+
+**LED Champagne Skirts**
+Experiencia interactiva donde el servicio se convierte en espectáculo visual.
+*Ideal para: bienvenida, eventos VIP, cócteles*
+
+**Cosmic Girls**
+Personajes futuristas con estética fashion y galáctica.
+*Ideal para: Ibiza vibes, eventos premium, recepciones*
+
+**Teddy Monster**
+Criatura de gran impacto visual diseñada para momentos de alto impacto.
+*Ideal para: peak time, fiesta, momentos sorpresa*
+
+### 🎪 CIRCUS & PHYSICAL ACTS
+
+**Slinky Man**
+Personaje sorprendente y visual que genera interacción inmediata con el público.
+*Ideal para: eventos dinámicos, activaciones*
+
+**Zancudos Neons**
+Zancudos con iluminación que dominan el espacio visual desde la altura.
+*Ideal para: festivales, recepciones, grandes eventos*
+
+**Aerial Acrobats / Aerial Silk**
+Actuaciones aéreas de alto nivel que aportan espectacularidad y elegancia.
+*Ideal para: cenas de gala, eventos premium*
+
+**Contorsion / Handstand / Slack Line**
+Actos físicos de gran técnica y control corporal.
+*Ideal para: shows centrales, eventos artísticos*
+
+**Water Ball**
+Performance visual dentro de una esfera de agua.
+*Ideal para: eventos exteriores, experiencias únicas*
+
+### 🔥 FIRE & FLOW
+
+**Fuego Show**
+Espectáculo visual con fuego que genera un momento impactante y memorable.
+*Ideal para: show principal, momentos wow*
+
+### 🎨 ART & EXPERIENCES
+
+**Live Painting**
+Creación artística en directo durante el evento.
+*Ideal para: eventos corporativos, bodas, branding*
+
+**Graffiti Custom**
+Arte urbano personalizado en vivo.
+*Ideal para: marcas, activaciones, eventos creativos*
+
+**VR Art Performance**
+Experiencia de arte digital en tiempo real con tecnología inmersiva.
+*Ideal para: eventos innovadores, tecnología*
+
+**Camouflage Body Painting**
+Body painting artístico que se integra con el entorno.
+*Ideal para: experiencias visuales, eventos creativos*
+
+**Glitter Make-Up**
+Maquillaje artístico para invitados como parte de la experiencia.
+*Ideal para: festivales, eventos interactivos*
+
+### 🎧 MUSIC & ENTERTAINMENT
+
+**DJ**
+Set musical adaptado al evento y al público.
+*Ideal para: fiestas, bodas, eventos corporativos*
+
+**Sax / Live Musicians**
+Música en vivo que eleva la energía y acompaña al DJ.
+*Ideal para: sunset, cóctel, fiesta*
+
+**LED Violinist**
+Fusión de música y visuales con alto impacto escénico.
+*Ideal para: eventos premium, momentos especiales*
+
+### 🎩 MAGIC
+
+**Magician**
+Magia de cerca o show interactivo para sorprender a los invitados.
+*Ideal para: cócteles, cenas, eventos exclusivos*
 
 ---
 
