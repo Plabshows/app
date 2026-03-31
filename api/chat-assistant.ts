@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
+import * as path from 'path';
 
-export const config = {
-  runtime: 'edge',
-};
-
-export async function POST(req: Request) {
-  console.log("Chat Assistant API v2.2 (Edge) Initialized");
+export default async function handler(req: Request) {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+  console.log("Chat Assistant API v2.3 (Node.js) Initialized");
   try {
     let prompt, userId;
     try {
@@ -48,6 +49,14 @@ export async function POST(req: Request) {
  
     const artistContext = (artists || []).map(a => `- ${a.name}: ${a.description}`).join('\n');
  
+    const systemPromptPath = path.join(process.cwd(), 'performance_lab_full_system.md');
+    let performanceLabKnowledge = '';
+    try {
+        performanceLabKnowledge = fs.readFileSync(systemPromptPath, 'utf8');
+    } catch (err) {
+        console.error("Error leyendo performance_lab_full_system.md:", err);
+    }
+
     const systemInstruction = `Eres la Inteligencia Artificial de Soporte Concierge VIP de Performance Lab.
 Tu misión es proporcionar una experiencia de lujo, rápida y eficiente a nuestros clientes y artistas.
 
@@ -56,9 +65,12 @@ SOPORTE CONCIERGE:
 - LISTA DE ARTISTAS DISPONIBLES:
 ${artistContext}
 
+CONOCIMIENTO Y REGLAS DE NEGOCIO DEL SISTEMA:
+${performanceLabKnowledge}
+
 INSTRUCCIONES:
-1. RECOMENDACIONES: Usa la lista anterior.
-2. SOPORTE: Responde dudas técnicas o comerciales.
+1. RECOMENDACIONES: Usa la lista y el conocimiento del sistema anterior.
+2. SOPORTE: Responde dudas técnicas o comerciales usando las reglas dadas.
 3. IDIOMA: Responde en el mismo idioma que el usuario.
 `;
  
