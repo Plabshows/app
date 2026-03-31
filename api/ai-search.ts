@@ -114,7 +114,7 @@ If no matches exist, return [].`;
 
     let matches: { id: string, reason: string }[] = [];
     try {
-        const jsonMatch = textResult.match(/\[.*\]/s);
+        const jsonMatch = textResult.match(/\[[\s\S]*\]/);
         matches = JSON.parse(jsonMatch ? jsonMatch[0] : textResult);
     } catch (e) {
         console.error("AI Parse Error:", textResult);

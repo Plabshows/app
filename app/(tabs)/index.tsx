@@ -1,7 +1,7 @@
 import { OFFICIAL_CATEGORIES, CATEGORY_ICONS } from '@/src/constants/categories';
 import { COLORS, SPACING } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
-import { AuthGate } from '@/src/components/auth/AuthGate';
+
 import { useActs } from '@/src/hooks/useActs';
 import { supabase } from '@/src/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
