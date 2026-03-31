@@ -1,16 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
+export const config = {
+  runtime: 'edge',
+};
+
 export async function POST(req: Request) {
-  console.log("Chat Assistant API v2.1 Initialized");
+  console.log("Chat Assistant API v2.2 (Edge) Initialized");
   try {
-    const { prompt, userId } = await req.json();
+    let prompt, userId;
+    try {
+      const body = await req.json();
+      prompt = body.prompt;
+      userId = body.userId;
+    } catch (e) {
+      console.error("Error parseando JSON del Request:", e);
+    }
 
     if (!prompt) {
+      console.error('Petición cancelada porque falta el query/body');
       return new Response(JSON.stringify({ error: 'Falta el mensaje del usuario' }), { status: 400 });
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-    // Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local Expo dev)
+    // Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local dev)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
     // Use SERVICE_ROLE_KEY to bypass RLS on backend
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -19,7 +31,9 @@ export async function POST(req: Request) {
         return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });
     }
  
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
  
     // 1. Fetch Context
     const { data: artists, error: artistError } = await supabase

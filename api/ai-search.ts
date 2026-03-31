@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local Expo dev)
+export const config = {
+  runtime: 'edge',
+};
+
+// Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local dev)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
 // Always use SERVICE_ROLE_KEY on backend to bypass RLS and see all published artists
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
 
 const CATEGORY_MAP: Record<string, string> = {
     '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',
@@ -24,9 +30,16 @@ const CATEGORY_MAP: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
+    let prompt;
+    try {
+      const body = await req.json();
+      prompt = body.prompt;
+    } catch (e) {
+      console.error("Error parseando JSON del Request:", e);
+    }
 
     if (!prompt) {
+      console.error('Petición cancelada porque falta el query/body');
       return new Response(JSON.stringify({ error: 'Falta el requerimiento del cliente' }), { status: 400 });
     }
 
@@ -36,6 +49,8 @@ export async function POST(req: Request) {
         .select('id, name, description, category_id, categories')
         .eq('is_published', true)
         .or('role.eq.artist,role.eq.talent');
+        
+    console.log('Resultados de Supabase:', allArtists);
 
     if (fetchError) {
         console.error("Supabase Fetch Error:", fetchError);
@@ -108,9 +123,9 @@ If no matches exist, return [].`;
 
     if (!Array.isArray(matches) || matches.length === 0) {
         return new Response(JSON.stringify({ 
-            results: [], 
-            categories: [],
-            debug: { artistCount: allArtists?.length || 0 }
+          results: [], 
+          categories: [],
+          debug: { artistCount: allArtists?.length || 0 }
         }), { 
             status: 200, 
             headers: { 'Content-Type': 'application/json' } 
