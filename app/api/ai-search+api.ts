@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Server-side: prefer NEXT_PUBLIC_ (Vercel web), fallback to EXPO_PUBLIC_ (local Expo dev)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL!;
-// Always use SERVICE_ROLE_KEY on backend to bypass RLS and see all published artists
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+    }
+});
 
 const CATEGORY_MAP: Record<string, string> = {
     '636d2dcd-3e1d-4b1e-b111-a6400ca1b025': 'Musicians',

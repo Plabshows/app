@@ -19,7 +19,13 @@ export async function POST(req: Request) {
         return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });
     }
  
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false
+        }
+    });
  
     // 1. Fetch Context
     const { data: artists, error: artistError } = await supabase
