@@ -2,24 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export default async function handler(req: Request) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
-  console.log("Chat Assistant API v2.3 (Node.js) Initialized");
+  console.log("Chat Assistant API v2.4 (Node.js) Initialized");
   try {
-    let prompt, userId;
-    try {
-      const body = await req.json();
-      prompt = body.prompt;
-      userId = body.userId;
-    } catch (e) {
-      console.error("Error parseando JSON del Request:", e);
-    }
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const prompt = body?.prompt;
+    const userId = body?.userId;
 
     if (!prompt) {
       console.error('Petición cancelada porque falta el query/body');
-      return new Response(JSON.stringify({ error: 'Falta el mensaje del usuario' }), { status: 400 });
+      return res.status(400).json({ error: 'Falta el mensaje del usuario' });
     }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
@@ -29,7 +24,7 @@ export default async function handler(req: Request) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
  
     if (!GEMINI_API_KEY) {
-        return new Response(JSON.stringify({ error: 'Configuración: Falta GEMINI_API_KEY' }), { status: 500 });
+        return res.status(500).json({ error: 'Configuración: Falta GEMINI_API_KEY' });
     }
  
     const supabase = createClient(supabaseUrl, supabaseKey, {
@@ -44,7 +39,7 @@ export default async function handler(req: Request) {
       .or('role.eq.artist,role.eq.talent');
  
     if (artistError) {
-        return new Response(JSON.stringify({ error: `Error DB Artistas: ${artistError.message}` }), { status: 500 });
+        return res.status(500).json({ error: `Error DB Artistas: ${artistError.message}` });
     }
  
     const artistContext = (artists || []).map(a => `- ${a.name}: ${a.description}`).join('\n');
@@ -87,9 +82,9 @@ INSTRUCCIONES:
     if (!geminiRes.ok) {
         const errBody = await geminiRes.text();
         console.error("Gemini Chat API Error:", geminiRes.status, errBody);
-        return new Response(JSON.stringify({ 
+        return res.status(500).json({ 
             error: 'Lo siento, no puedo procesar tu solicitud en este momento por un problema técnico. Inténtalo de nuevo pronto.' 
-        }), { status: 500 });
+        });
     }
 
     const geminiData = await geminiRes.json();
@@ -117,7 +112,7 @@ INSTRUCCIONES:
         insertedMessage = msg;
     }
 
-    return new Response(JSON.stringify({ 
+    return res.status(200).json({ 
         response: botResponse, 
         message: insertedMessage || {
             id: 'temp-' + Date.now(),
@@ -127,13 +122,11 @@ INSTRUCCIONES:
             created_at: new Date().toISOString(),
             status: 'unread'
         }
-    }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error: any) {
     console.error("Chat Assistant Global Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return res.status(500).json({ error: error.message });
   }
 }
+
